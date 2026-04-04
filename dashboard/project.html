@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projekt — Device Inventor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #0f172a;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .back-btn {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .back-btn:hover { background: #334155; color: #f1f5f9; }
+
+  .header-info { flex: 1; }
+  .header-info h1 { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+  .header-info p { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+  .session-badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .session-badge.new { background: #1e293b; color: #475569; border: 1px solid #334155; }
+  .session-badge.active { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 0;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 65px);
+  }
+
+  /* Lewa kolumna: plan + chat */
+  .left-panel {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #1e293b;
+    overflow: hidden;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #1e293b;
+    background: #0f172a;
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s;
+  }
+  .tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+  .tab:hover:not(.active) { color: #94a3b8; }
+
+  .tab-content { display: none; }
+  .tab-content.active { flex: 1; overflow-y: auto; padding: 24px; min-height: 0; display: block; }
+  .chat-panel.active { display: flex !important; flex-direction: column; overflow: hidden; padding: 0; min-height: 0; flex: 1; }
+
+  /* Plan markdown */
+  .markdown-content { font-size: 14px; line-height: 1.7; color: #cbd5e1; }
+  .markdown-content h2 { font-size: 16px; font-weight: 700; color: #f1f5f9; margin: 20px 0 8px; }
+  .markdown-content h3 { font-size: 14px; font-weight: 600; color: #e2e8f0; margin: 16px 0 6px; }
+  .markdown-content p { margin-bottom: 10px; }
+  .markdown-content ul, .markdown-content ol { padding-left: 20px; margin-bottom: 10px; }
+  .markdown-content li { margin-bottom: 4px; }
+  .markdown-content code { background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #7dd3fc; }
+  .markdown-content pre { background: #1e293b; padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin-bottom: 10px; }
+  .markdown-content pre code { background: none; padding: 0; }
+  .markdown-content strong { color: #f1f5f9; font-weight: 600; }
+  .markdown-content table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  .markdown-content th { background: #1e293b; color: #94a3b8; padding: 8px 12px; text-align: left; font-size: 12px; }
+  .markdown-content td { padding: 8px 12px; border-top: 1px solid #1e293b; font-size: 13px; }
+  .markdown-content hr { border: none; border-top: 1px solid #334155; margin: 16px 0; }
+
+  /* Chat */
+  .chat-panel {
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .chat-start {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 60px 40px 40px;
+    text-align: center;
+  }
+
+  .chat-start h2 { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+  .chat-start p { font-size: 14px; color: #64748b; line-height: 1.6; max-width: 400px; }
+
+  .btn-start {
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    color: #fff;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn-start:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-start:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    display: none;
+  }
+  .messages.visible { display: flex; }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 85%;
+  }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.assistant { align-self: flex-start; align-items: flex-start; }
+
+  .msg-label {
+    font-size: 10px;
+    color: #475569;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .msg-bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .msg.user .msg-bubble {
+    background: #1e40af;
+    color: #e0f2fe;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.assistant .msg-bubble {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-bottom-left-radius: 4px;
+    white-space: pre-wrap;
+  }
+
+  .msg.assistant .msg-bubble .markdown-content {
+    font-size: 14px;
+  }
+
+  .thinking {
+    align-self: flex-start;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    color: #475569;
+    font-size: 13px;
+    padding: 8px 0;
+  }
+  .thinking.visible { display: flex; }
+
+  .dot-flashing {
+    display: flex;
+    gap: 4px;
+  }
+  .dot-flashing span {
+    width: 6px; height: 6px;
+    background: #475569;
+    border-radius: 50%;
+    animation: dotFlash 1.2s infinite;
+  }
+  .dot-flashing span:nth-child(2) { animation-delay: 0.2s; }
+  .dot-flashing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotFlash { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+  .chat-input-area {
+    border-top: 1px solid #1e293b;
+    padding: 16px;
+    display: none;
+    gap: 10px;
+    flex-direction: column;
+  }
+  .chat-input-area.visible { display: flex; }
+
+  .chat-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .chat-textarea {
+    flex: 1;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #e2e8f0;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 10px 14px;
+    resize: none;
+    font-family: inherit;
+    min-height: 44px;
+    max-height: 140px;
+  }
+  .chat-textarea:focus { outline: none; border-color: #3b82f6; }
+  .chat-textarea::placeholder { color: #475569; }
+
+  .send-btn {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .send-btn:hover { background: #2563eb; }
+  .send-btn:disabled { background: #334155; cursor: not-allowed; }
+
+  .chat-hint {
+    font-size: 11px;
+    color: #334155;
+    text-align: center;
+  }
+
+  /* Prawa kolumna: info */
+  .right-panel {
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    gap: 16px;
+    background: #0a1628;
+  }
+
+  .info-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .info-card h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+
+  .module-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .module-item {
+    font-size: 13px;
+    color: #94a3b8;
+    padding: 6px 10px;
+    background: #0f172a;
+    border-radius: 6px;
+    border: 1px solid #1e293b;
+  }
+
+  .cost-big {
+    font-size: 28px;
+    font-weight: 800;
+    color: #60a5fa;
+  }
+  .cost-sub { font-size: 12px; color: #475569; margin-top: 4px; }
+
+  .badge-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .badge-blue { background: #1e3a5f; color: #60a5fa; }
+  .badge-green { background: #052e16; color: #4ade80; }
+  .badge-yellow { background: #422006; color: #fbbf24; }
+  .badge-red { background: #450a0a; color: #f87171; }
+
+  .progress-area {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+  .progress-area.has-content { color: #94a3b8; }
+
+  .no-plan {
+    text-align: center;
+    padding: 40px 20px;
+    color: #475569;
+    font-size: 14px;
+  }
+
+  .proj-header {
+    padding-bottom: 20px;
+    border-bottom: 1px solid #1e293b;
+    margin-bottom: 20px;
+  }
+  .proj-title { font-size: 22px; font-weight: 800; color: #f1f5f9; }
+  .proj-tagline { font-size: 13px; color: #64748b; font-style: italic; margin-top: 4px; }
+
+  .proj-section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #1e293b;
+  }
+  .proj-section:last-child { border-bottom: none; }
+  .proj-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+
+  .proj-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .proj-table th {
+    background: #0f172a;
+    color: #64748b;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .proj-table td {
+    padding: 7px 10px;
+    border-top: 1px solid #1e293b;
+    color: #94a3b8;
+  }
+  .proj-table tr:hover td { background: #1e293b; }
+
+  .module-item { position: relative; overflow: hidden; }
+  .module-item.status-none { border-color: #7f1d1d; color: #fca5a5; background: #1a0a0a; }
+  .module-item.status-transit { border-color: #78350f; color: #e2e8f0; background: #1a1000; }
+  .module-item.status-delivered { border-color: #14532d; color: #86efac; background: #0a1a0f; }
+
+  .delivery-bar {
+    position: absolute; left: 0; top: 0; height: 100%;
+    background: linear-gradient(90deg, rgba(234,179,8,0.18) 0%, rgba(234,179,8,0.10) 60%, transparent 100%);
+    pointer-events: none;
+    transition: width 0.5s ease;
+  }
+  .delivery-bar::after {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 30px; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(234,179,8,0.25));
+    animation: barShimmer 2s ease-in-out infinite;
+  }
+  @keyframes barShimmer {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .module-item .comp-status-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    display: inline-block; margin-right: 5px;
+  }
+  .status-none .comp-status-dot { background: #ef4444; }
+  .status-transit .comp-status-dot { background: #f59e0b; }
+  .status-delivered .comp-status-dot { background: #22c55e; }
+
+  .shop-empty { color:#475569; font-size:13px; padding: 12px 0; line-height:1.7; }
+  .shop-summary { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid #1e293b; }
+  .shop-stat { }
+  .shop-stat-val { font-size:20px; font-weight:800; color:#f1f5f9; }
+  .shop-stat-label { font-size:11px; color:#475569; margin-top:2px; }
+  .shop-group { margin-bottom:20px; }
+  .shop-group-title { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; }
+  .shop-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; border:1px solid #1e293b; margin-bottom:6px; background:#0f172a; transition:border-color 0.15s; }
+  .shop-item:hover { border-color:#334155; }
+  .shop-item.bought { opacity:0.45; }
+  .shop-item.bought .shop-name { text-decoration:line-through; }
+  .shop-check { width:20px; height:20px; border-radius:5px; border:1px solid #334155; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:12px; transition:background 0.15s; }
+  .shop-check:hover { border-color:#60a5fa; }
+  .shop-item.bought .shop-check { background:#166534; border-color:#166534; color:#4ade80; }
+  .shop-name { font-size:13px; color:#e2e8f0; font-weight:600; flex:1; }
+  .shop-notes { font-size:11px; color:#64748b; }
+  .shop-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .shop-qty { font-size:11px; color:#64748b; }
+  .shop-price { font-size:13px; font-weight:700; color:#60a5fa; }
+  .shop-store { font-size:11px; padding:2px 8px; border-radius:4px; background:#1e293b; color:#94a3b8; }
+
+  .prog-row { margin-bottom: 10px; }
+  .prog-label { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-bottom: 4px; font-weight: 600; }
+  .prog-track { background: #0f172a; border-radius: 4px; height: 8px; overflow: hidden; }
+  .prog-bar { height: 100%; border-radius: 4px; transition: width 0.6s ease; width: 0%; }
+  .prog-bar.proto { background: linear-gradient(90deg, #3b82f6, #06b6d4); }
+  .prog-bar.comm  { background: linear-gradient(90deg, #8b5cf6, #ec4899); }
+  .prog-bar.docs  { background: linear-gradient(90deg, #10b981, #84cc16); }
+
+  .task-group { margin-bottom: 10px; }
+  .task-group-label { font-size: 10px; color: #475569; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .task-item { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: #64748b; padding: 3px 0; line-height: 1.4; }
+  .task-item.done { color: #334155; text-decoration: line-through; }
+  .task-check { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #334155; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+  .task-item.done .task-check { background: #166534; border-color: #166534; color: #4ade80; }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="back-btn">← Dashboard</a>
+  <div class="header-info">
+    <h1 id="project-name">Ładowanie...</h1>
+    <p id="project-tagline"></p>
+  </div>
+  <span class="session-badge new" id="session-badge">Nowa sesja</span>
+</header>
+
+<div class="main">
+  <!-- Lewa: plan + chat -->
+  <div class="left-panel">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('plan')">🗺️ Plan wstępny</div>
+      <div class="tab" onclick="switchTab('chat')">💬 Rozmowa</div>
+      <div class="tab" onclick="switchTab('projekt')">📌 Projekt</div>
+      <div class="tab" onclick="switchTab('shopping')">📦 Komponenty</div>
+    </div>
+
+    <div class="tab-content active" id="tab-plan">
+      <div id="plan-content">
+        <div class="no-plan">Ładowanie planu...</div>
+      </div>
+    </div>
+
+    <div class="tab-content chat-panel" id="tab-chat">
+      <!-- Stan: przed startem -->
+      <div class="chat-start" id="chat-start">
+        <div style="font-size:48px">🚀</div>
+        <h2>Rozpocznij sesję</h2>
+        <p>Claude wczyta kontekst projektu — plan, Twoją wizję, poprzednie notatki. Napisz cokolwiek żeby zacząć.</p>
+        <button class="btn-start" id="start-btn" onclick="startSession()">Otwórz czat</button>
+      </div>
+
+      <!-- Stan: rozmowa -->
+      <div class="messages" id="messages"></div>
+      <div class="thinking" id="thinking">
+        <div class="dot-flashing"><span></span><span></span><span></span></div>
+        Claude myśli...
+      </div>
+      <div class="chat-input-area" id="chat-input-area">
+        <div class="chat-input-row">
+          <textarea class="chat-textarea" id="chat-input"
+            placeholder="Napisz coś..."
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResizeChat(this)"></textarea>
+          <button class="send-btn" id="send-btn" onclick="sendMessage()">↑</button>
+        </div>
+        <div class="chat-hint">Enter = wyślij &nbsp;·&nbsp; Shift+Enter = nowa linia &nbsp;·&nbsp;
+          <button onclick="endSession()" style="background:none;border:none;color:#475569;font-size:11px;cursor:pointer;padding:0;text-decoration:underline">Zakończ i zapisz →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-projekt">
+      <div id="projekt-content"></div>
+    </div>
+
+    <div class="tab-content" id="tab-shopping">
+      <div id="shopping-content"></div>
+    </div>
+  </div>
+
+  <!-- Prawa: info -->
+  <div class="right-panel">
+    <div class="info-card">
+      <h3>Czas pracy</h3>
+      <div style="font-size:26px;font-weight:800;color:#a78bfa" id="total-time">—</div>
+      <div style="font-size:11px;color:#475569;margin-top:4px" id="sessions-count">0 sesji</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;display:none" id="live-timer-wrap">
+        <div style="font-size:11px;color:#4ade80;font-weight:600">● Sesja aktywna</div>
+        <div style="font-size:20px;font-weight:700;color:#4ade80;font-variant-numeric:tabular-nums" id="live-timer">00:00:00</div>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <h3>Komponenty <span style="font-size:10px;color:#334155;font-weight:400">→ szczegóły w zakładce 🛒</span></h3>
+      <div class="module-list" id="modules-list">—</div>
+    </div>
+
+    <div class="info-card">
+      <h3>Szacowany koszt</h3>
+      <div class="cost-big" id="cost">—</div>
+      <div class="cost-sub">PLN (jedna sztuka)</div>
+    </div>
+
+    <div class="info-card">
+      <h3>Szczegóły</h3>
+      <div class="badge-row" id="badges"></div>
+    </div>
+
+    <div class="info-card">
+      <h3>Postęp prac</h3>
+      <div id="progress-bars">
+        <div class="prog-row">
+          <div class="prog-label"><span>🔧 Prototyp</span><span id="pct-prototype">0%</span></div>
+          <div class="prog-track"><div class="prog-bar proto" id="bar-prototype"></div></div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-label"><span>🏭 Komercyjna</span><span id="pct-commercial">0%</span></div>
+          <div class="prog-track"><div class="prog-bar comm" id="bar-commercial"></div></div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-label"><span>📄 Dokumentacja</span><span id="pct-docs">0%</span></div>
+          <div class="prog-track"><div class="prog-bar docs" id="bar-docs"></div></div>
+        </div>
+      </div>
+      <div id="tasks-list" style="margin-top:14px"></div>
+      <div style="font-size:10px;color:#334155;margin-top:10px">Claude aktualizuje zadania podczas rozmowy</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ideaId = parseInt(location.pathname.split('/').pop());
+let idea = null;
+let sessionActive = false;
+let chatHistory = [];
+let sessionStartTime = null;
+let liveTimerInterval = null;
+let totalTimeSeconds = 0;
+
+function formatTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function formatTimeLive(seconds) {
+  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+async function loadTimeStats() {
+  try {
+    const res = await fetch(`/api/ideas/${ideaId}/time`);
+    const data = await res.json();
+    totalTimeSeconds = data.total_seconds || 0;
+    const sessions = data.sessions || [];
+    document.getElementById('total-time').textContent = totalTimeSeconds > 0 ? formatTime(totalTimeSeconds) : '0m';
+    document.getElementById('sessions-count').textContent = `${sessions.length} ${sessions.length === 1 ? 'sesja' : sessions.length < 5 ? 'sesje' : 'sesji'}`;
+  } catch(e) {}
+}
+
+function startLiveTimer() {
+  sessionStartTime = Date.now();
+  document.getElementById('live-timer-wrap').style.display = 'block';
+  liveTimerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+    document.getElementById('live-timer').textContent = formatTimeLive(elapsed);
+    const total = totalTimeSeconds + elapsed;
+    document.getElementById('total-time').textContent = formatTime(total);
+  }, 1000);
+}
+
+async function loadIdea() {
+  const res = await fetch('/api/ideas');
+  const data = await res.json();
+  idea = data.ideas.find(i => i.id === ideaId);
+  if (!idea) { document.getElementById('project-name').textContent = 'Nie znaleziono projektu'; return; }
+
+  document.title = idea.name + ' — Device Inventor';
+  document.getElementById('project-name').textContent = idea.name;
+  document.getElementById('project-tagline').textContent = idea.tagline || '';
+  document.getElementById('cost').textContent = '~' + (idea.estimated_cost_pln || '?');
+
+  // Komponenty
+  const modList = document.getElementById('modules-list');
+  modList.innerHTML = (idea.modules || []).map(m =>
+    `<div class="module-item">${m}</div>`
+  ).join('') || '<span style="color:#475569">brak danych</span>';
+
+  // Badges
+  const diff = idea.difficulty || '';
+  const diffClass = diff === 'zaawansowany' ? 'badge-red' : diff === 'średni' ? 'badge-yellow' : 'badge-green';
+  document.getElementById('badges').innerHTML = `
+    <span class="badge badge-blue">${idea.status}</span>
+    <span class="badge ${diffClass}">${diff}</span>
+    ${idea.rating ? `<span class="badge badge-yellow">${'★'.repeat(idea.rating)}</span>` : ''}
+  `;
+
+  // Plan
+  const planDiv = document.getElementById('plan-content');
+  if (idea.preliminary_plan && idea.preliminary_plan.length > 10) {
+    planDiv.innerHTML = `<div class="markdown-content">${renderMarkdown(idea.preliminary_plan)}</div>`;
+  } else {
+    planDiv.innerHTML = `<div class="no-plan">
+      Plan nie został jeszcze wygenerowany.<br>
+      <a href="/" style="color:#60a5fa;font-size:13px;margin-top:8px;display:inline-block;">← Wróć do dashboardu i kliknij "Opracuj wstępnie"</a>
+    </div>`;
+  }
+
+  loadProgress();
+  loadProjektTab();
+  loadTimeStats();
+  loadTasks();
+  loadComponents();
+  loadShoppingTab();
+}
+
+function getDeliveryProgress(c) {
+  if (!c.purchased || !c.order_date) return null;
+  const orderMs = new Date(c.order_date).getTime();
+  const days = c.delivery_days || 14;
+  const deliveryMs = orderMs + days * 86400000;
+  const now = Date.now();
+  const pct = Math.min(100, Math.max(5, Math.round((now - orderMs) / (deliveryMs - orderMs) * 100)));
+  const daysLeft = Math.max(0, Math.round((deliveryMs - now) / 86400000));
+  return { pct, daysLeft };
+}
+
+async function loadComponents() {
+  const el = document.getElementById('modules-list');
+  if (!el || !idea) return;
+  try {
+    const res = await fetch(`/api/ideas/${ideaId}/components`);
+    if (res.ok) {
+      const items = await res.json();
+      if (items.length > 0) {
+        el.innerHTML = items.map(c => {
+          let statusClass = 'status-none';
+          let barHtml = '';
+          let label = c.name + (c.qty > 1 ? ` ×${c.qty}` : '');
+          if (c.delivered) {
+            statusClass = 'status-delivered';
+          } else if (c.purchased) {
+            statusClass = 'status-transit';
+            const prog = getDeliveryProgress(c);
+            if (prog) {
+              barHtml = `<div class="delivery-bar" style="width:${prog.pct}%"></div>`;
+              label += ` <span style="font-size:10px;color:#f59e0b">~${prog.daysLeft}d</span>`;
+            }
+          }
+          return `<div class="module-item ${statusClass}" style="display:flex;align-items:center">
+            ${barHtml}<span class="comp-status-dot"></span><span style="position:relative;z-index:1;font-size:12px">${label}</span>
+          </div>`;
+        }).join('');
+        return;
+      }
+    }
+  } catch(e) {}
+  el.innerHTML = (idea.modules || []).map(m =>
+    `<div class="module-item">${m}</div>`
+  ).join('') || '<span style="color:#475569;font-size:12px">brak danych</span>';
+}
+
+async function loadShoppingTab() {
+  const el = document.getElementById('shopping-content');
+  if (!el) return;
+  let items = [];
+  try {
+    const res = await fetch(`/api/ideas/${ideaId}/components`);
+    if (res.ok) items = await res.json();
+  } catch(e) {}
+
+  if (!items.length) {
+    el.innerHTML = `<div class="shop-empty">
+      Brak listy komponentów.<br>
+      Podczas rozmowy w zakładce <a href="#" onclick="switchTab('chat');return false;" style="color:#60a5fa;text-decoration:none">💬 Rozmowa</a> poproś Claude: <em>"Zapisz listę komponentów do pliku components.json"</em>.
+    </div>`;
+    return;
+  }
+
+  const total = items.reduce((s, c) => s + (c.price_pln || 0) * (c.qty || 1), 0);
+  const bought = items.filter(c => c.purchased);
+  const boughtCost = bought.reduce((s, c) => s + (c.price_pln || 0) * (c.qty || 1), 0);
+
+  const groups = {};
+  items.forEach((c, i) => {
+    const cat = c.category || 'Inne';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push({ ...c, _idx: i });
+  });
+
+  const groupsHtml = Object.entries(groups).map(([cat, citems]) => `
+    <div class="shop-group">
+      <div class="shop-group-title">${cat}</div>
+      ${citems.map(c => `
+        <div class="shop-item${c.purchased ? ' bought' : ''}" id="shop-item-${c._idx}">
+          <div class="shop-check" onclick="togglePurchased(${c._idx})">${c.purchased ? '✓' : ''}</div>
+          <div style="flex:1;min-width:0">
+            <div class="shop-name">${c.name}</div>
+            ${c.notes ? `<div class="shop-notes">${c.notes}</div>` : ''}
+          </div>
+          <div class="shop-right">
+            ${c.qty > 1 ? `<span class="shop-qty">×${c.qty}</span>` : ''}
+            <span class="shop-price">${c.price_pln ? `~${c.price_pln * (c.qty||1)} PLN` : '—'}</span>
+            ${c.shop ? `<span class="shop-store">${c.shop}</span>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="shop-summary">
+      <div class="shop-stat">
+        <div class="shop-stat-val">${items.length}</div>
+        <div class="shop-stat-label">komponentów</div>
+      </div>
+      <div class="shop-stat">
+        <div class="shop-stat-val" style="color:#60a5fa">~${Math.round(total)} PLN</div>
+        <div class="shop-stat-label">łączny koszt</div>
+      </div>
+      <div class="shop-stat">
+        <div class="shop-stat-val" style="color:#4ade80">${bought.length}/${items.length}</div>
+        <div class="shop-stat-label">kupione (~${Math.round(boughtCost)} PLN)</div>
+      </div>
+    </div>
+    ${groupsHtml}`;
+}
+
+async function togglePurchased(idx) {
+  await fetch(`/api/ideas/${ideaId}/components/toggle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ index: idx })
+  });
+  await Promise.all([loadComponents(), loadShoppingTab()]);
+}
+
+async function loadTasks() {
+  try {
+    const res = await fetch(`/api/ideas/${ideaId}/tasks`);
+    if (!res.ok) return;
+    const tasks = await res.json();
+
+    const cats = [
+      { key: 'prototype', barId: 'bar-prototype', pctId: 'pct-prototype', label: '🔧 Prototyp' },
+      { key: 'commercial', barId: 'bar-commercial', pctId: 'pct-commercial', label: '🏭 Komercyjna' },
+      { key: 'docs',      barId: 'bar-docs',       pctId: 'pct-docs',       label: '📄 Dokumentacja' },
+    ];
+
+    let allGroups = '';
+    cats.forEach(({ key, barId, pctId, label }) => {
+      const items = tasks[key] || [];
+      const done = items.filter(t => t.done).length;
+      const total = items.length;
+      const pct = total > 0 ? Math.round(done / total * 100) : 0;
+      document.getElementById(barId).style.width = pct + '%';
+      document.getElementById(pctId).textContent = pct + '%';
+
+      if (items.length > 0) {
+        const rows = items.map(t => `
+          <div class="task-item ${t.done ? 'done' : ''}">
+            <div class="task-check">${t.done ? '✓' : ''}</div>
+            <span>${t.text}</span>
+          </div>`).join('');
+        allGroups += `<div class="task-group"><div class="task-group-label">${label}</div>${rows}</div>`;
+      }
+    });
+
+    document.getElementById('tasks-list').innerHTML = allGroups ||
+      '<div style="font-size:11px;color:#334155;padding:4px 0">Brak zadań — Claude doda je podczas rozmowy</div>';
+  } catch(e) {}
+}
+
+async function loadProgress() {
+  try {
+    const res = await fetch(`/api/ideas/${ideaId}/progress`);
+    if (res.ok) {
+      const text = await res.text();
+      const el = document.getElementById('progress-area');
+      if (text && text.trim() !== '(brak zapisów)' && text.trim() !== '# Postęp projektu\n\n(brak zapisów)') {
+        el.textContent = text;
+        el.classList.add('has-content');
+      }
+    }
+  } catch(e) {}
+}
+
+async function startSession() {
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Ładuję...';
+
+  await fetch(`/api/ideas/${ideaId}/init-project`, { method: 'POST' });
+  await fetch(`/api/ideas/${ideaId}/time/start`, { method: 'POST' });
+
+  document.getElementById('chat-start').style.display = 'none';
+  document.getElementById('messages').classList.add('visible');
+  document.getElementById('chat-input-area').classList.add('visible');
+  document.getElementById('session-badge').textContent = 'Sesja aktywna';
+  document.getElementById('session-badge').className = 'session-badge active';
+  sessionActive = true;
+  startLiveTimer();
+  document.getElementById('chat-input').focus();
+}
+
+function switchTab(tab) {
+  const tabNames = ['plan', 'chat', 'projekt', 'shopping'];
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', tabNames[i] === tab);
+  });
+  ['plan', 'chat', 'projekt', 'shopping'].forEach(name => {
+    const el = document.getElementById('tab-' + name);
+    if (el) el.classList.toggle('active', name === tab);
+  });
+  if (tab === 'projekt') loadProjektTab();
+  if (tab === 'shopping') loadShoppingTab();
+}
+
+function addMessage(role, text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const label = role === 'user' ? 'Ty' : 'Claude';
+  const bubble = role === 'assistant'
+    ? `<div class="msg-bubble"><div class="markdown-content">${renderMarkdown(text)}</div></div>`
+    : `<div class="msg-bubble">${text.replace(/\n/g, '<br>')}</div>`;
+  div.innerHTML = `<div class="msg-label">${label}</div>${bubble}`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendToClaude(message) {
+  const thinking = document.getElementById('thinking');
+  const sendBtn = document.getElementById('send-btn');
+  thinking.classList.add('visible');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const res = await fetch(`/api/ideas/${ideaId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      addMessage('assistant', '⚠️ Błąd: ' + data.error);
+    } else {
+      addMessage('assistant', data.response);
+      if (data.session_id) {
+        document.getElementById('session-badge').textContent = 'Sesja aktywna';
+        document.getElementById('session-badge').className = 'session-badge active';
+      }
+    }
+  } catch(e) {
+    addMessage('assistant', '⚠️ Błąd połączenia: ' + e.message);
+  } finally {
+    thinking.classList.remove('visible');
+    if (sendBtn) sendBtn.disabled = false;
+    const msgs = document.getElementById('messages');
+    msgs.scrollTop = msgs.scrollHeight;
+    refreshSidePanel();
+  }
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const message = input.value.trim();
+  if (!message || !sessionActive) return;
+
+  input.value = '';
+  autoResizeChat(input);
+  addMessage('user', message);
+  chatHistory.push({ role: 'user', content: message });
+
+  await sendToClaude(message);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResizeChat(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/```[\s\S]*?```/g, m => `<pre><code>${m.slice(3, -3).replace(/^\w+\n/, '')}</code></pre>`)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]+?<\/li>)/g, m => `<ul>${m}</ul>`)
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/^(?!<[hul]|<li|<pre|<code)(.+)$/gm, '<p>$1</p>')
+    .replace(/\n{2,}/g, '');
+}
+
+async function loadProjektTab() {
+  if (!idea) return;
+  let progressText = '';
+  try {
+    const res = await fetch(`/api/ideas/${ideaId}/progress`);
+    if (res.ok) progressText = await res.text();
+  } catch(e) {}
+
+  const cleaned = (progressText || '').trim().replace(/^# Postęp projektu\s*\n\s*\(brak zapisów\)\s*$/, '').trim();
+  const hasProgress = cleaned.length > 20;
+
+  const diff = idea.difficulty || '—';
+  const diffColor = diff === 'zaawansowany' ? '#f87171' : diff === 'średni' ? '#fbbf24' : '#4ade80';
+
+  const modulesTable = (idea.modules || []).map(m =>
+    `<tr><td>${m}</td></tr>`
+  ).join('');
+
+  if (!hasProgress) {
+    document.getElementById('projekt-content').innerHTML = `
+      <div class="chat-start">
+        <div style="font-size:48px">📌</div>
+        <h2>Brak zapisów projektu</h2>
+        <p>Przejdź do zakładki Rozmowa, popracuj nad projektem i kliknij "Zakończ i zapisz" — tutaj pojawi się podsumowanie sesji.</p>
+        <button class="btn-start" onclick="switchTab('chat')">Przejdź do Rozmowy</button>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('projekt-content').innerHTML = `
+    <div class="proj-header">
+      <div class="proj-title">${idea.name}</div>
+      <div class="proj-tagline">${idea.tagline || ''}</div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">💡 Opis projektu</div>
+      <p style="font-size:14px;color:#94a3b8;line-height:1.7">${idea.description || '—'}</p>
+    </div>
+
+    ${idea.notes ? `<div class="proj-section">
+      <div class="proj-section-title">🎯 Wizja Czarka</div>
+      <p style="font-size:14px;color:#c4b5fd;line-height:1.7;background:#1e1b4b;padding:12px 16px;border-radius:8px;border-left:3px solid #6366f1">${idea.notes.replace(/\n/g, '<br>')}</p>
+    </div>` : ''}
+
+    <div class="proj-section">
+      <div class="proj-section-title">Szczegóły</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:#475569;margin-bottom:4px">Szacowany koszt</div>
+          <div style="font-size:22px;font-weight:800;color:#60a5fa">~${idea.estimated_cost_pln || '?'} PLN</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#475569;margin-bottom:4px">Poziom trudności</div>
+          <div style="font-size:16px;font-weight:700;color:${diffColor}">${diff}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:#475569">Szczegółowa lista komponentów → zakładka 📦 Komponenty</div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">📋 Notatki z sesji</div>
+      <div class="markdown-content">${renderMarkdown(progressText)}</div>
+    </div>
+  `;
+}
+
+async function endSession() {
+  if (!sessionActive) return;
+  const btn = document.querySelector('[onclick="endSession()"]');
+  if (btn) { btn.textContent = 'Zapisuję...'; btn.style.pointerEvents = 'none'; }
+
+  const summary = `Zapisz podsumowanie tej sesji do memory/progress.md.
+
+WAŻNE: NIE kopiuj transkryptu rozmowy. Napisz tylko strukturalne notatki w tym formacie:
+
+# Postęp projektu — ${new Date().toLocaleDateString('pl-PL')}
+
+## Co omówiliśmy
+(2-4 zdania — temat sesji, nie dialog)
+
+## Kluczowe decyzje
+(lista decyzji technicznych, wyborów komponentów, architektonicznych itp.)
+
+## Wyzwania
+(problemy napotkane lub przewidywane)
+
+## Na czym skończyliśmy
+(konkretnie — ostatni temat/krok)
+
+## Co dalej
+(kolejne kroki, od czego zacząć następnym razem)
+
+Zapisz plik i potwierdź jednym zdaniem.`;
+
+  addMessage('user', '📌 Kończę sesję — zapisuję podsumowanie...');
+  await sendToClaude(summary);
+
+  // Zatrzymaj timer i zapisz czas
+  if (liveTimerInterval) {
+    clearInterval(liveTimerInterval);
+    liveTimerInterval = null;
+  }
+  await fetch(`/api/ideas/${ideaId}/time/end`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+  await loadTimeStats();
+  document.getElementById('live-timer-wrap').style.display = 'none';
+
+  if (btn) { btn.textContent = 'Zakończ i zapisz →'; btn.style.pointerEvents = ''; }
+  await Promise.all([loadProjektTab(), loadTasks()]);
+  switchTab('projekt');
+}
+
+async function refreshSidePanel() {
+  try {
+    const res = await fetch('/api/ideas');
+    const data = await res.json();
+    const updated = data.ideas.find(i => i.id === ideaId);
+    if (!updated) return;
+    idea = updated;
+
+    document.getElementById('project-name').textContent = idea.name;
+    document.getElementById('project-tagline').textContent = idea.tagline || '';
+    document.getElementById('cost').textContent = '~' + (idea.estimated_cost_pln || '?');
+
+    document.getElementById('modules-list').innerHTML = (idea.modules || []).map(m =>
+      `<div class="module-item">${m}</div>`
+    ).join('') || '<span style="color:#475569">brak danych</span>';
+
+    const diff = idea.difficulty || '';
+    const diffClass = diff === 'zaawansowany' ? 'badge-red' : diff === 'średni' ? 'badge-yellow' : 'badge-green';
+    document.getElementById('badges').innerHTML = `
+      <span class="badge badge-blue">${idea.status}</span>
+      <span class="badge ${diffClass}">${diff}</span>
+      ${idea.rating ? `<span class="badge badge-yellow">${'★'.repeat(idea.rating)}</span>` : ''}
+    `;
+
+    loadProgress();
+    loadTasks();
+    loadComponents();
+  } catch(e) {}
+}
+
+loadIdea();
+</script>
+</body>
+</html>

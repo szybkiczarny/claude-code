@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Device Inventor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #0f172a;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 { font-size: 20px; font-weight: 700; color: #f1f5f9; }
+  header p { font-size: 13px; color: #64748b; }
+
+  .stats {
+    margin-left: auto;
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: #64748b;
+  }
+  .stats span strong { color: #94a3b8; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    padding: 24px 32px;
+    align-items: start;
+  }
+
+  .column { background: #1e293b; border-radius: 12px; overflow: hidden; }
+
+  .column-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .column-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .column-header .count {
+    background: #334155;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: auto;
+  }
+
+  .col-nowe .column-header { border-top: 3px solid #3b82f6; }
+  .col-moze .column-header { border-top: 3px solid #f59e0b; }
+  .col-godne .column-header { border-top: 3px solid #10b981; }
+
+  .cards {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 100px;
+  }
+
+  .card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+
+  .card:hover { border-color: #475569; transform: translateY(-1px); }
+
+  .card-name { font-size: 15px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+  .card-tagline { font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 12px; line-height: 1.4; }
+
+  .card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+  .badge-cost { background: #1e3a5f; color: #60a5fa; }
+  .badge-diff { background: #1a2e1a; color: #4ade80; }
+  .badge-diff.sredni { background: #2d2a12; color: #fbbf24; }
+  .badge-diff.zaawansowany { background: #2d1515; color: #f87171; }
+
+  .modules { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
+  .module-tag { font-size: 10px; background: #1e293b; color: #64748b; border: 1px solid #334155; padding: 2px 6px; border-radius: 4px; }
+
+  .stars { display: flex; gap: 4px; margin-bottom: 12px; align-items: center; }
+  .star { font-size: 20px; cursor: pointer; transition: transform 0.1s; color: #334155; user-select: none; }
+  .star:hover, .star.active { color: #fbbf24; }
+  .star:hover { transform: scale(1.2); }
+  .stars-divider { width: 1px; height: 18px; background: #334155; margin: 0 4px; }
+  .neg-star { font-size: 20px; cursor: pointer; transition: transform 0.1s; color: #334155; user-select: none; }
+  .neg-star:hover, .neg-star.active { color: #ef4444; }
+  .neg-star:hover { transform: scale(1.2); }
+
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .btn {
+    font-size: 12px; font-weight: 600; padding: 6px 12px;
+    border-radius: 6px; border: none; cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-tak { background: #10b981; color: #fff; }
+  .btn-tak:hover { background: #059669; }
+  .btn-moze { background: #f59e0b; color: #000; }
+  .btn-moze:hover { background: #d97706; }
+  .btn-nie { background: #334155; color: #94a3b8; }
+  .btn-nie:hover { background: #475569; }
+  .btn-rozwin { background: #3b82f6; color: #fff; }
+  .btn-rozwin:hover { background: #2563eb; }
+  .btn-details { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+  .btn-details:hover { background: #334155; color: #f1f5f9; }
+  .btn-elaborate { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; }
+  .btn-elaborate:hover { background: linear-gradient(135deg, #6d28d9, #4338ca); }
+  .btn-elaborate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .elaborate-status {
+    font-size: 11px;
+    color: #4ade80;
+    margin-top: 8px;
+    display: none;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 760px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .modal-header h2 { font-size: 18px; font-weight: 700; color: #f1f5f9; flex: 1; }
+
+  .modal-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 24px;
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+  }
+
+  .modal-tab {
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s;
+  }
+  .modal-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+  .modal-tab:hover { color: #94a3b8; }
+
+  .modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .modal-body.hidden { display: none; }
+
+  .markdown-content {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #cbd5e1;
+  }
+
+  .markdown-content h2 { font-size: 16px; font-weight: 700; color: #f1f5f9; margin: 20px 0 8px; }
+  .markdown-content h3 { font-size: 14px; font-weight: 600; color: #e2e8f0; margin: 16px 0 6px; }
+  .markdown-content p { margin-bottom: 10px; }
+  .markdown-content ul, .markdown-content ol { padding-left: 20px; margin-bottom: 10px; }
+  .markdown-content li { margin-bottom: 4px; }
+  .markdown-content code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #7dd3fc; }
+  .markdown-content pre { background: #0f172a; padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin-bottom: 10px; }
+  .markdown-content pre code { background: none; padding: 0; }
+  .markdown-content strong { color: #f1f5f9; font-weight: 600; }
+  .markdown-content table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  .markdown-content th { background: #0f172a; color: #94a3b8; padding: 8px 12px; text-align: left; font-size: 12px; }
+  .markdown-content td { padding: 8px 12px; border-top: 1px solid #334155; font-size: 13px; }
+  .markdown-content hr { border: none; border-top: 1px solid #334155; margin: 16px 0; }
+
+  .elaborate-placeholder {
+    text-align: center;
+    padding: 40px 20px;
+    color: #475569;
+  }
+
+  .elaborate-placeholder p { margin-bottom: 16px; font-size: 14px; }
+
+  .btn-close {
+    background: #334155;
+    color: #94a3b8;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-close:hover { background: #475569; color: #f1f5f9; }
+
+  .odrzucone-section { padding: 0 32px 32px; }
+  .odrzucone-toggle {
+    background: none; border: 1px solid #334155; color: #475569;
+    font-size: 13px; padding: 8px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 12px;
+  }
+  .odrzucone-toggle:hover { color: #64748b; }
+  .odrzucone-cards { display: none; flex-wrap: wrap; gap: 12px; }
+  .odrzucone-cards.visible { display: flex; }
+  .odrzucone-cards .card { opacity: 0.4; width: 280px; }
+  .odrzucone-cards .card:hover { opacity: 0.7; }
+
+  .empty-col { color: #334155; font-size: 13px; text-align: center; padding: 20px; font-style: italic; }
+
+  .card-expand {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #1e293b;
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.6;
+    display: none;
+  }
+  .card-expand.visible { display: block; }
+  .btn-expand { background: #1e293b; color: #64748b; border: 1px solid #334155; margin-top: 8px; }
+  .btn-expand:hover { background: #334155; color: #94a3b8; }
+
+  .card-notes {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #1e293b;
+  }
+
+  .notes-label {
+    font-size: 11px;
+    color: #475569;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .notes-label.has-note { color: #60a5fa; }
+
+  .notes-textarea {
+    width: 100%;
+    background: #0a1628;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    resize: none;
+    font-family: inherit;
+    transition: border-color 0.2s, color 0.2s;
+    min-height: 52px;
+  }
+
+  .notes-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    color: #e2e8f0;
+  }
+
+  .notes-textarea::placeholder { color: #334155; }
+  .notes-saved { font-size: 10px; color: #4ade80; margin-top: 3px; display: none; }
+
+  .btn-expand-note {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #475569;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .btn-expand-note:hover { color: #94a3b8; }
+
+  .note-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .note-modal-overlay.open { display: flex; }
+  .note-modal {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+  }
+  .note-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+  }
+  .note-modal textarea {
+    width: 100%;
+    min-height: 240px;
+    background: #0a1628;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 12px 14px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .note-modal textarea:focus { outline: none; border-color: #3b82f6; }
+  .note-modal-footer { display: flex; justify-content: flex-end; gap: 8px; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #1e293b; color: #f1f5f9;
+    padding: 12px 20px; border-radius: 8px; font-size: 13px;
+    border: 1px solid #334155; opacity: 0; transition: opacity 0.3s;
+    pointer-events: none; z-index: 200;
+  }
+  .toast.show { opacity: 1; }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>⚡ Device Inventor</h1>
+    <p>Projekty elektroniczne dla nastolatków i dorosłych</p>
+  </div>
+  <div class="stats">
+    <span><strong id="stat-total">0</strong> pomysłów</span>
+    <span><strong id="stat-approved">0</strong> zatwierdzonych</span>
+    <span><strong id="stat-rated">0</strong> ocenionych</span>
+  </div>
+</header>
+
+<div class="board">
+  <div class="column col-nowe">
+    <div class="column-header">
+      <h2>🆕 Nowe propozycje</h2>
+      <span class="count" id="count-nowe">0</span>
+    </div>
+    <div class="cards" id="cards-nowe"></div>
+  </div>
+  <div class="column col-moze">
+    <div class="column-header">
+      <h2>🤔 Do rozważenia</h2>
+      <span class="count" id="count-moze">0</span>
+    </div>
+    <div class="cards" id="cards-moze"></div>
+  </div>
+  <div class="column col-godne">
+    <div class="column-header">
+      <h2>🏆 Projekty godne uwagi</h2>
+      <span class="count" id="count-godne">0</span>
+    </div>
+    <div class="cards" id="cards-godne"></div>
+  </div>
+</div>
+
+<div class="odrzucone-section">
+  <button class="odrzucone-toggle" onclick="toggleOdrzucone()">▼ Pokaż odrzucone</button>
+  <div class="odrzucone-cards" id="cards-odrzucone"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" onclick="closeModalOnBg(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">—</h2>
+      <button class="btn-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <div class="modal-tab active" id="tab-details" onclick="switchTab('details')">📋 Szczegółowy opis</div>
+      <div class="modal-tab" id="tab-plan" onclick="switchTab('plan')">🗺️ Plan wstępny</div>
+    </div>
+    <div class="modal-body" id="body-details">
+      <div class="markdown-content" id="modal-details-content"></div>
+    </div>
+    <div class="modal-body hidden" id="body-plan">
+      <div id="modal-plan-content"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Note modal -->
+<div class="note-modal-overlay" id="note-modal" onclick="closeNoteModalOnBg(event)">
+  <div class="note-modal">
+    <div class="note-modal-header">
+      <span id="note-modal-title">📝 Notatka</span>
+      <button class="btn-close" onclick="closeNoteModal()">✕</button>
+    </div>
+    <textarea id="note-modal-textarea" placeholder="Wpisz swoją wizję..."></textarea>
+    <div class="note-modal-footer">
+      <button class="btn btn-nie" onclick="closeNoteModal()">Anuluj</button>
+      <button class="btn btn-tak" onclick="saveNoteModal()">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let ideas = [];
+let activeModalId = null;
+let elaboratingIds = new Set();
+let describingIds = new Set();
+let pollInterval = null;
+let noteModalId = null;
+
+async function loadIdeas() {
+  const res = await fetch('/api/ideas');
+  const data = await res.json();
+  ideas = data.ideas;
+  render();
+}
+
+function render() {
+  const nowe    = ideas.filter(i => i.status === 'nowy');
+  const moze    = ideas.filter(i => i.status === 'do_rozważenia' || i.status === 'do_rozwinięcia');
+  const godne   = ideas.filter(i => i.status === 'zatwierdzony');
+  const odrzuc  = ideas.filter(i => i.status === 'odrzucony');
+
+  document.getElementById('cards-nowe').innerHTML    = nowe.length  ? nowe.map(c => renderCard(c)).join('') : '<div class="empty-col">Brak nowych propozycji</div>';
+  document.getElementById('cards-moze').innerHTML    = moze.length  ? moze.map(c => renderCard(c)).join('') : '<div class="empty-col">Nic tu jeszcze</div>';
+  document.getElementById('cards-godne').innerHTML   = godne.length ? godne.sort((a,b) => (b.rating||0)-(a.rating||0)).map(c => renderCard(c)).join('') : '<div class="empty-col">Zatwierdź projekt żeby tu trafił</div>';
+  document.getElementById('cards-odrzucone').innerHTML = odrzuc.map(c => renderCard(c)).join('');
+
+  document.getElementById('count-nowe').textContent  = nowe.length;
+  document.getElementById('count-moze').textContent  = moze.length;
+  document.getElementById('count-godne').textContent = godne.length;
+  document.getElementById('stat-total').textContent   = ideas.length;
+  document.getElementById('stat-approved').textContent = godne.length;
+  document.getElementById('stat-rated').textContent   = ideas.filter(i => i.rating).length;
+
+  ideas.forEach(idea => {
+    const card = document.getElementById('card-' + idea.id);
+    if (!card) return;
+    card.querySelectorAll('.star').forEach((star, idx) => {
+      star.addEventListener('mouseenter', () => highlightStars(idea.id, idx + 1));
+      star.addEventListener('mouseleave', () => highlightStars(idea.id, idea.rating || 0));
+      star.addEventListener('click', () => setRating(idea.id, idx + 1));
+    });
+    card.querySelectorAll('.neg-star').forEach((star, idx) => {
+      star.addEventListener('mouseenter', () => highlightNegStars(idea.id, idx + 1));
+      star.addEventListener('mouseleave', () => highlightNegStars(idea.id, idea.negative_rating || 0));
+      star.addEventListener('click', () => setNegativeRating(idea.id, idx + 1));
+    });
+    const ta = card.querySelector('.notes-textarea');
+    if (ta && ta.value) autoResize(ta);
+  });
+}
+
+function renderCard(idea) {
+  const stars = [1,2,3,4,5].map(n =>
+    `<span class="star ${(idea.rating||0) >= n ? 'active' : ''}" data-n="${n}">★</span>`
+  ).join('');
+  const negStars = [1,2,3].map(n =>
+    `<span class="neg-star ${(idea.negative_rating||0) >= n ? 'active' : ''}" data-n="${n}">▼</span>`
+  ).join('');
+
+  const diffClass = idea.difficulty === 'średni' ? 'sredni' : idea.difficulty === 'zaawansowany' ? 'zaawansowany' : '';
+  const modules = idea.modules.map(m => `<span class="module-tag">${m}</span>`).join('');
+  const isGodne = idea.status === 'zatwierdzony';
+  const isMoze  = idea.status === 'do_rozważenia' || idea.status === 'do_rozwinięcia';
+
+  const elaborating = elaboratingIds.has(idea.id);
+  const describing = describingIds.has(idea.id);
+  const hasPlan = idea.preliminary_plan && idea.preliminary_plan.length > 10;
+  const hasDesc = idea.detailed_description && idea.detailed_description.length > 10;
+
+  const expandBtn = `
+    <button class="btn btn-expand" id="expand-btn-${idea.id}" onclick="toggleExpand(${idea.id})">
+      ${describing ? '<span class="spinner"></span>Generuję...' : '↕ Rozwiń opis'}
+    </button>
+    <div class="card-expand" id="expand-${idea.id}">
+      ${hasDesc ? idea.detailed_description : ''}
+    </div>
+  `;
+
+  const elaborateBtn = isGodne ? `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <button class="btn btn-elaborate" id="elaborate-btn-${idea.id}"
+        onclick="elaborateIdea(${idea.id})"
+        ${hasPlan || elaborating ? 'disabled style="opacity:0.35;cursor:not-allowed"' : ''}>
+        ${elaborating ? '<span class="spinner"></span>Generuję...' : '🗺️ Generuj plan'}
+      </button>
+      ${hasPlan && !elaborating
+        ? `<a href="/project/${idea.id}" class="btn" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;text-decoration:none;">🚀 Zacznij opracowywać</a>`
+        : `<button class="btn" disabled style="opacity:0.35;cursor:not-allowed;background:#334155;color:#94a3b8;">🚀 Zacznij opracowywać</button>`}
+    </div>
+  ` : '';
+
+  return `
+  <div class="card" id="card-${idea.id}">
+    <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px">
+      <div style="flex:1">
+        <div class="card-name">${idea.name}</div>
+        <div class="card-tagline">${idea.tagline}</div>
+      </div>
+    </div>
+
+    <div class="card-meta">
+      <span class="badge badge-cost">~${idea.estimated_cost_pln} PLN</span>
+      <span class="badge badge-diff ${diffClass}">${idea.difficulty}</span>
+    </div>
+
+    <div class="modules">${modules}</div>
+    <div class="stars" id="stars-${idea.id}">${stars}<span class="stars-divider"></span>${negStars}</div>
+
+    <div class="actions">
+      ${!isGodne ? `<button class="btn btn-tak" onclick="rate(${idea.id},'zatwierdzony')">✓ Tak</button>` : ''}
+      ${!isMoze && !isGodne ? `<button class="btn btn-moze" onclick="rate(${idea.id},'do_rozważenia')">? Może</button>` : ''}
+      ${isGodne || isMoze ? `<button class="btn btn-nie" onclick="rate(${idea.id},'nowy')">↩ Cofnij</button>` : ''}
+      <button class="btn btn-nie" onclick="rate(${idea.id},'odrzucony')">✗ Nie</button>
+      <button class="btn btn-details" onclick="openModal(${idea.id})">📋 Plan</button>
+    </div>
+    ${expandBtn}
+    ${elaborateBtn}
+    <div class="card-notes">
+      <div class="notes-label ${idea.notes ? 'has-note' : ''}" id="notes-label-${idea.id}">
+        ${isGodne
+          ? (idea.notes ? '🎯 Twoja wizja (używana przy planie)' : '🎯 Twoja wizja — jak chcesz to rozwinąć?')
+          : (idea.notes ? '📝 Notatka' : '📝 Dodaj notatkę')}
+        <button class="btn-expand-note" onclick="openNoteModal(${idea.id})" title="Powiększ">↗</button>
+      </div>
+      <textarea
+        class="notes-textarea"
+        id="notes-${idea.id}"
+        placeholder="${isGodne
+          ? 'Opisz swój kierunek: co zmienić, dodać, inaczej podejść... Claude uwzględni to przy generowaniu planu.'
+          : 'np. fajny kierunek ale za prosty, może dodać AI... albo: interesuje mnie wariant z radarem mmWave'}"
+        onblur="saveNote(${idea.id})"
+        oninput="autoResize(this)"
+      >${idea.notes || ''}</textarea>
+      <div class="notes-saved" id="notes-saved-${idea.id}">✓ zapisano</div>
+    </div>
+    ${isGodne ? `
+    <div class="card-notes" style="margin-top:6px">
+      <div class="notes-label ${idea.note ? 'has-note' : ''}" id="note-label-${idea.id}">
+        ${idea.note ? '📝 Notatka (widoczna przy skanowaniu)' : '📝 Notatka — co już zrobione, co warto wiedzieć'}
+      </div>
+      <textarea
+        class="notes-textarea"
+        id="note-${idea.id}"
+        placeholder="np. wizja już zrealizowana w innym projekcie, wersja z ESP32 gotowa, zostało tylko..."
+        onblur="saveCardNote(${idea.id})"
+        oninput="autoResize(this)"
+      >${idea.note || ''}</textarea>
+      <div class="notes-saved" id="note-saved-${idea.id}">✓ zapisano</div>
+    </div>` : ''}
+  </div>`;
+}
+
+function highlightStars(id, n) {
+  const container = document.getElementById('stars-' + id);
+  if (!container) return;
+  container.querySelectorAll('.star').forEach((star, idx) => {
+    star.style.color = idx < n ? '#fbbf24' : '#334155';
+  });
+}
+
+async function setRating(id, rating) {
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+  const newRating = idea.rating === rating ? null : rating;
+  idea.rating = newRating;
+  highlightStars(id, newRating || 0);
+  await saveIdea(id, { rating: newRating });
+  showToast(newRating ? `Ocena: ${newRating} ★` : 'Ocena usunięta');
+  render();
+}
+
+function highlightNegStars(id, n) {
+  const container = document.getElementById('stars-' + id);
+  if (!container) return;
+  container.querySelectorAll('.neg-star').forEach((star, idx) => {
+    star.style.color = idx < n ? '#ef4444' : '#334155';
+  });
+}
+
+async function setNegativeRating(id, rating) {
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+  const newRating = idea.negative_rating === rating ? null : rating;
+  idea.negative_rating = newRating;
+  highlightNegStars(id, newRating || 0);
+  await saveIdea(id, { negative_rating: newRating });
+  showToast(newRating ? `Wyklucz siłę: ${newRating} ▼` : 'Negatywna ocena usunięta');
+  render();
+}
+
+async function rate(id, status) {
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+  idea.status = status;
+  await saveIdea(id, { status });
+  const labels = { zatwierdzony: '🏆 Zatwierdzono!', do_rozważenia: '🤔 Do rozważenia', odrzucony: '✗ Odrzucono', nowy: '↩ Cofnięto' };
+  showToast(labels[status] || 'Zapisano');
+  render();
+}
+
+async function toggleExpand(id) {
+  const box = document.getElementById('expand-' + id);
+  const btn = document.getElementById('expand-btn-' + id);
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+
+  // Jeśli już widoczne — zwiń
+  if (box.classList.contains('visible')) {
+    box.classList.remove('visible');
+    btn.textContent = '↕ Rozwiń opis';
+    return;
+  }
+
+  // Jeśli opis już jest — pokaż od razu
+  if (idea.detailed_description && idea.detailed_description.length > 10) {
+    box.innerHTML = idea.detailed_description.replace(/\n/g, '<br>');
+    box.classList.add('visible');
+    btn.textContent = '↕ Zwiń opis';
+    return;
+  }
+
+  // Brak opisu — generuj
+  describingIds.add(id);
+  btn.innerHTML = '<span class="spinner"></span>Generuję...';
+  btn.disabled = true;
+  showToast('Generuję rozszerzony opis...');
+
+  await fetch(`/api/ideas/${id}/describe`, { method: 'POST' });
+
+  const poll = setInterval(async () => {
+    const res = await fetch('/api/ideas');
+    const data = await res.json();
+    ideas = data.ideas;
+    const updated = ideas.find(i => i.id === id);
+    if (updated && updated.detailed_description && updated.detailed_description.length > 10) {
+      clearInterval(poll);
+      describingIds.delete(id);
+      box.innerHTML = updated.detailed_description.replace(/\n/g, '<br>');
+      box.classList.add('visible');
+      btn.innerHTML = '↕ Zwiń opis';
+      btn.disabled = false;
+    }
+  }, 3000);
+}
+
+async function elaborateIdea(id) {
+  elaboratingIds.add(id);
+  render();
+  showToast('🗺️ Generuję plan — zajmie ok. 1-2 minuty...');
+
+  await fetch(`/api/ideas/${id}/elaborate`, { method: 'POST' });
+
+  // Polluj co 5s aż plan się pojawi
+  const poll = setInterval(async () => {
+    const res = await fetch('/api/ideas');
+    const data = await res.json();
+    ideas = data.ideas;
+    const idea = ideas.find(i => i.id === id);
+    if (idea && idea.preliminary_plan && idea.preliminary_plan.length > 10) {
+      clearInterval(poll);
+      elaboratingIds.delete(id);
+      render();
+      showToast('✅ Plan wstępny gotowy!');
+      openModal(id, 'plan');
+    }
+  }, 5000);
+}
+
+async function saveCardNote(id) {
+  const textarea = document.getElementById('note-' + id);
+  if (!textarea) return;
+  const note = textarea.value;
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+  if (idea.note === note) return;
+  idea.note = note;
+  await saveIdea(id, { note });
+  const saved = document.getElementById('note-saved-' + id);
+  const label = document.getElementById('note-label-' + id);
+  if (saved) { saved.style.display = 'block'; setTimeout(() => saved.style.display = 'none', 2000); }
+  if (label) {
+    label.textContent = note ? '📝 Notatka (widoczna przy skanowaniu)' : '📝 Notatka — co już zrobione, co warto wiedzieć';
+    label.className = 'notes-label' + (note ? ' has-note' : '');
+  }
+}
+
+async function saveNote(id) {
+  const textarea = document.getElementById('notes-' + id);
+  if (!textarea) return;
+  const notes = textarea.value;
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+  if (idea.notes === notes) return; // bez zmian
+  idea.notes = notes;
+  await saveIdea(id, { notes });
+  const saved = document.getElementById('notes-saved-' + id);
+  const label = document.getElementById('notes-label-' + id);
+  if (saved) { saved.style.display = 'block'; setTimeout(() => saved.style.display = 'none', 2000); }
+  if (label) {
+    label.textContent = notes ? '📝 Notatka' : '📝 Dodaj notatkę';
+    label.className = 'notes-label' + (notes ? ' has-note' : '');
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function openNoteModal(id) {
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+  noteModalId = id;
+  const isGodne = idea.status === 'zatwierdzony';
+  document.getElementById('note-modal-title').textContent = isGodne ? '🎯 Twoja wizja — ' + idea.name : '📝 Notatka — ' + idea.name;
+  document.getElementById('note-modal-textarea').value = idea.notes || '';
+  document.getElementById('note-modal').classList.add('open');
+  setTimeout(() => document.getElementById('note-modal-textarea').focus(), 50);
+}
+
+async function saveNoteModal() {
+  if (noteModalId === null) return;
+  const textarea = document.getElementById('note-modal-textarea');
+  const notes = textarea.value;
+  const idea = ideas.find(i => i.id === noteModalId);
+  if (!idea) return;
+  idea.notes = notes;
+  await saveIdea(noteModalId, { notes });
+  // sync do małego textarea na karcie
+  const cardTextarea = document.getElementById('notes-' + noteModalId);
+  if (cardTextarea) { cardTextarea.value = notes; autoResize(cardTextarea); }
+  const label = document.getElementById('notes-label-' + noteModalId);
+  if (label) {
+    const isGodne = idea.status === 'zatwierdzony';
+    const btn = label.querySelector('.btn-expand-note');
+    label.className = 'notes-label' + (notes ? ' has-note' : '');
+    label.innerHTML = (isGodne
+      ? (notes ? '🎯 Twoja wizja (używana przy planie)' : '🎯 Twoja wizja — jak chcesz to rozwinąć?')
+      : (notes ? '📝 Notatka' : '📝 Dodaj notatkę'));
+    label.innerHTML += `<button class="btn-expand-note" onclick="openNoteModal(${noteModalId})" title="Powiększ">↗</button>`;
+  }
+  closeNoteModal();
+  showToast('✓ Zapisano');
+}
+
+function closeNoteModal() {
+  document.getElementById('note-modal').classList.remove('open');
+  noteModalId = null;
+}
+
+function closeNoteModalOnBg(e) {
+  if (e.target === document.getElementById('note-modal')) closeNoteModal();
+}
+
+async function saveIdea(id, data) {
+  await fetch(`/api/ideas/${id}/rate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+}
+
+// Modal
+function openModal(id, tab) {
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+  activeModalId = id;
+
+  document.getElementById('modal-title').textContent = idea.name;
+
+  const detailsContent = idea.detailed_description
+    ? renderMarkdown(idea.detailed_description)
+    : `<p style="color:#475569;font-style:italic">Brak szczegółowego opisu dla tego projektu.</p>`;
+  document.getElementById('modal-details-content').innerHTML = detailsContent;
+
+  const planContent = idea.preliminary_plan && idea.preliminary_plan.length > 10
+    ? `<div class="markdown-content">${renderMarkdown(idea.preliminary_plan)}</div>`
+    : `<div class="elaborate-placeholder">
+        <p>Plan wstępny nie został jeszcze wygenerowany.</p>
+        ${idea.status === 'zatwierdzony'
+          ? `<button class="btn btn-elaborate" onclick="closeModal(); elaborateIdea(${id})">🗺️ Opracuj wstępnie</button>`
+          : '<p style="font-size:12px">Zatwierdź projekt żeby odblokować generowanie planu.</p>'}
+       </div>`;
+  document.getElementById('modal-plan-content').innerHTML = planContent;
+
+  switchTab(tab || 'details');
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  activeModalId = null;
+}
+
+function closeModalOnBg(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-details').classList.toggle('active', tab === 'details');
+  document.getElementById('tab-plan').classList.toggle('active', tab === 'plan');
+  document.getElementById('body-details').classList.toggle('hidden', tab !== 'details');
+  document.getElementById('body-plan').classList.toggle('hidden', tab !== 'plan');
+}
+
+// Prosty renderer Markdown → HTML
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/```[\s\S]*?```/g, m => `<pre><code>${m.slice(3, -3).replace(/^\w+\n/, '')}</code></pre>`)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^\|(.+)\|$/gm, (_, row) => {
+      const cells = row.split('|').map(c => c.trim());
+      return '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+    })
+    .replace(/(<tr>[\s\S]+?<\/tr>)/g, m => `<table>${m}</table>`)
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]+?<\/li>)/g, m => `<ul>${m}</ul>`)
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/^---$/gm, '<hr>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hupoltc])(.+)$/gm, '$1')
+    .replace(/<\/ul>\s*<ul>/g, '')
+    .replace(/<\/table>\s*<table>/g, '');
+}
+
+function toggleOdrzucone() {
+  const el = document.getElementById('cards-odrzucone');
+  const btn = document.querySelector('.odrzucone-toggle');
+  el.classList.toggle('visible');
+  btn.textContent = el.classList.contains('visible') ? '▲ Ukryj odrzucone' : '▼ Pokaż odrzucone';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+loadIdeas();
+</script>
+</body>
+</html>

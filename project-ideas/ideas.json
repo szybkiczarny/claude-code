@@ -1,0 +1,29 @@
+{
+  "ideas": [
+    {
+      "id": 62,
+      "name": "ChessVision",
+      "tagline": "Szachownica z AI wizją — kamera CV rozpoznaje pozycję figur i Stockfish analizuje każdy ruch",
+      "description": "Kamera IMX219 zamontowana 50cm nad planszą (na ramieniu 3D) + reCamera SG2002 (RISC-V AI, 1 TOPS) z modelem YOLOv8 nano doszkolonym na zbiorze figur szachowych (dataset z Roboflow). Po każdym ruchu model CV wykrywa pozycję wszystkich figur na 64 polach i przekazuje FEN string do Stockfish 16 lite (port na RISC-V). Stockfish zwraca: eval bar (+/-), top 3 ruchy z notacją algebraiczną, wykryte taktyki (widełki, szachmat w N ruchach). TFT 5\" 800x480 obok planszy wyświetla panel: aktualna pozycja (render 2D), eval bar, najlepsze ruchy. Historia partii zapisywana do PGN na karcie SD — import na Lichess.org po grze.",
+      "why_kids_love_it": "Po każdym ruchu na planszy ekran mówi ci czy zrobiłeś błąd i jak Stockfish by zagrał. Żadnych aplikacji, żadnych kliknięć — po prostu grasz, a kamera widzi wszystko sama.",
+      "modules": [
+        "reCamera SG2002 (RISC-V AI, 1 TOPS)",
+        "Kamera IMX219 (CSI)",
+        "TFT 5\" 800x480 HDMI",
+        "MicroSD 32GB",
+        "12V PSU lub LiPo 10000mAh",
+        "Ramię 3D (mocowanie kamery nad planszą)"
+      ],
+      "estimated_cost_pln": 480,
+      "difficulty": "zaawansowany",
+      "added_date": "2026-04-03",
+      "status": "nowy",
+      "rating": null,
+      "notes": "",
+      "detailed_description": "",
+      "preliminary_plan": "",
+      "negative_rating": null,
+      "note": ""
+    }
+  ]
+}

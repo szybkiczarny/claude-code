@@ -1,0 +1,26 @@
+# Sekrety — nigdy do repozytorium
+.env
+*.env
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Logi
+*.log
+nohup.out
+
+# Dane generowalne
+project-ideas/generate.log
+project-ideas/bot.log
+
+# Claude cache
+.claude/cache/
+.claude/downloads/
+.claude/sessions/
+.claude/telemetry/
+.claude/history.jsonl
+.claude/paste-cache/

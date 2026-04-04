@@ -8,21 +8,22 @@ Twój osobisty setup do odkrywania i budowania projektów elektronicznych z pomo
 ```bash
 npm install -g @anthropic-ai/claude-code
 ```
-Lub sprawdź aktualne instrukcje na: https://claude.ai/code
 
-### 2. Skonfiguruj .env
+### 2. Zaloguj się (subskrypcja Pro — bez klucza API)
 ```bash
-cp .env.template .env
-# Otwórz .env i wpisz swój klucz Anthropic API
+claude login
 ```
+Otworzy się przeglądarka — zaloguj się swoim kontem claude.ai. To wystarczy, żadnego klucza API nie potrzebujesz.
 
 ### 3. Uruchom Claude w tym katalogu
 ```bash
-cd kuba-starter
+cd ~/CLAUDE_CODE
 claude
 ```
 
-Claude przywita się i przeprowadzi Cię przez resztę konfiguracji (GitHub, Telegram, dashboard).
+Gru przywita się i przeprowadzi Cię przez resztę konfiguracji (GitHub, Telegram, dashboard).
+
+> `.env` potrzebujesz dopiero gdy będziesz chciał bota Telegram — wtedy `cp .env.template .env` i uzupełnij tylko `TELEGRAM_TOKEN` i `TELEGRAM_CHAT_ID`.
 
 ## Co tu jest
 

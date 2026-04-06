@@ -41,14 +41,14 @@ Przeszukaj sieć pod kątem:
 - **Notatki przy pomysłach** (pole "notes") są najważniejszą wskazówką — czytaj je dla WSZYSTKICH pomysłów. To bezpośrednie instrukcje od użytkownika.
 - **Pole "note" na zatwierdzonych projektach** — to notatki o stanie realizacji. Czytaj je i NIE generuj pomysłów które pokrywają to co już zostało zrobione.
 
-## Krok 3: Wygeneruj 8 nowych pomysłów w proporcji 50/50
+## Krok 3: Wygeneruj 6 nowych pomysłów w proporcji 50/50
 
-### Pula A — 4 pomysły bazujące na preferencjach użytkownika
+### Pula A — 3 pomysły bazujące na preferencjach użytkownika
 Opieraj się na tym co już zatwierdzono, co ma wysokie gwiazdki, na notatkach i wizjach użytkownika.
 - Podobna kategoria, techniczność, vibe do tego co lubi
 - Rozwijaj wątki z notatek (np. "chcę wariant z radarem" → zrób go)
 
-### Pula B — 4 pomysły z własnej inwencji agenta
+### Pula B — 3 pomysły z własnej inwencji agenta
 Tu masz pełną swobodę twórczą. Nie oglądaj się na preferencje — zaproponuj coś czego użytkownik jeszcze nie widział.
 - Inspiruj się tym co znalazłeś w internecie, ale idź dalej — kombinuj technologie, odwracaj założenia
 - Możesz zaproponować coś z innych dziedzin (robotyka, audio, instalacje interaktywne, narzędzia z AI)

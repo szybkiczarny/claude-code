@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/.env"
 SKILL="$SCRIPT_DIR/device-inventor/SKILL.md"
 IDEAS="$SCRIPT_DIR/project-ideas/ideas.json"
 LOG="$SCRIPT_DIR/project-ideas/generate.log"
-CLAUDE_BIN="${CLAUDE_BIN:-$HOME/.local/bin/claude}"
+CLAUDE_BIN="${CLAUDE_BIN:-$(which claude 2>/dev/null || echo $HOME/.local/bin/claude)}"
 TELEGRAM_CHAT="$TELEGRAM_CHAT_ID"
 
 send_telegram() {

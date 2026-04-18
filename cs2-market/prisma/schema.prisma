@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  steamId      String        @unique
+  displayName  String
+  avatarUrl    String
+  balance      Float         @default(0)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+  inventory    UserItem[]
+}
+
+model Item {
+  id           String        @id @default(cuid())
+  name         String
+  exterior     String
+  rarity       String
+  imageUrl     String
+  price        Float
+  float        Float?
+  caseId       String?
+  case         Case?         @relation(fields: [caseId], references: [id])
+  transactions Transaction[]
+  userItems    UserItem[]
+}
+
+model Case {
+  id       String @id @default(cuid())
+  name     String
+  imageUrl String
+  price    Float
+  items    Item[]
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  itemId    String
+  type      String   // buy | win | deposit | withdraw
+  amount    Float
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  item      Item     @relation(fields: [itemId], references: [id])
+}
+
+model UserItem {
+  id     String @id @default(cuid())
+  userId String
+  itemId String
+  user   User   @relation(fields: [userId], references: [id])
+  item   Item   @relation(fields: [itemId], references: [id])
+
+  @@unique([userId, itemId])
+}

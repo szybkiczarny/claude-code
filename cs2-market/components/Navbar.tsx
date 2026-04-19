@@ -20,27 +20,27 @@ export default function Navbar({ user: initialUser }: { user?: NavUser | null })
 
   const links = [
     { href: "/cases", label: "Skrzynki", icon: "📦" },
-    { href: "/battle", label: "Battle", icon: "⚔️" },
-    { href: "/free", label: "Darmowe", icon: "🎁" },
+    { href: "/battle", label: "Battle", icon: "⚔️", badge: "HOT" },
+    { href: "/free", label: "Darmowe", icon: "🎁", badge: "DAILY" },
   ];
 
   return (
     <>
     <nav className="sticky top-0 z-50" style={{
-      background: "rgba(8,8,15,0.92)",
-      backdropFilter: "blur(16px)",
+      background: "rgba(6,10,18,0.94)",
+      backdropFilter: "blur(20px)",
       borderBottom: "1px solid var(--border)",
     }}>
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-1.5 flex-shrink-0">
+        <Link href="/" className="flex items-center gap-0.5 flex-shrink-0">
           <span className="text-xl font-black tracking-tight" style={{
-            background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+            background: "linear-gradient(135deg, #f97316, #fb923c)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}>CS2</span>
-          <span className="text-xl font-black text-white tracking-tight">DROP</span>
+          <span className="text-xl font-black tracking-tight" style={{ color: "var(--text)" }}>DROP</span>
         </Link>
 
         {/* Nav links — desktop */}
@@ -49,12 +49,17 @@ export default function Navbar({ user: initialUser }: { user?: NavUser | null })
             <Link
               key={l.href}
               href={l.href}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all hover:text-white"
-              style={{ color: "var(--muted2)" }}
-              onMouseEnter={e => (e.currentTarget.style.background = "var(--bg3)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold hover:text-white hover:bg-white/5"
+              style={{ color: "var(--muted2)", transition: "color 0.15s, background 0.15s" }}
             >
-              <span>{l.icon}</span> {l.label}
+              <span>{l.icon}</span>
+              <span>{l.label}</span>
+              {(l as any).badge && (
+                <span className="text-xs font-black px-1.5 py-0.5 rounded-full"
+                  style={{ background: "var(--neon)", color: "white", fontSize: "8px", lineHeight: 1.2 }}>
+                  {(l as any).badge}
+                </span>
+              )}
             </Link>
           ))}
         </div>

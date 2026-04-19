@@ -29,7 +29,7 @@ export default function LiveDropsSidebar() {
   useEffect(() => {
     const interval = setInterval(() => {
       setDrops(prev => [randomDrop(), ...prev.slice(0, 24)]);
-    }, 2500);
+    }, 3800);
     return () => clearInterval(interval);
   }, []);
 
@@ -54,10 +54,10 @@ export default function LiveDropsSidebar() {
             return (
               <motion.div
                 key={drop.id}
-                initial={{ opacity: 0, x: 40, backgroundColor: `${c}22` }}
-                animate={{ opacity: 1, x: 0, backgroundColor: "transparent" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
+                initial={{ opacity: 0, y: -28, backgroundColor: `${c}28` }}
+                animate={{ opacity: 1, y: 0, backgroundColor: "transparent" }}
+                exit={{ opacity: 0, height: 0, marginBottom: -52 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                 className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-white/5"
                 style={{
                   borderBottom: "1px solid var(--border)",

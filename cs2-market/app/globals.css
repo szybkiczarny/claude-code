@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #08080f;
-  --bg2: #0e0e1a;
-  --bg3: #13131f;
-  --card: #0f0f1c;
-  --border: #1e1e30;
-  --border2: #2a2a40;
-  --neon: #7c3aed;
-  --neon2: #a855f7;
-  --neon-glow: rgba(124,58,237,0.4);
+  --bg: #060a12;
+  --bg2: #0b1120;
+  --bg3: #101828;
+  --card: #0d1525;
+  --border: #1a2538;
+  --border2: #243050;
+  --neon: #f97316;
+  --neon2: #fb923c;
+  --neon-glow: rgba(249,115,22,0.45);
   --gold: #f59e0b;
-  --gold-glow: rgba(245,158,11,0.3);
-  --text: #f0f0ff;
-  --muted: #6b6b8a;
-  --muted2: #9090b0;
+  --gold-glow: rgba(245,158,11,0.35);
+  --text: #eef2ff;
+  --muted: #5a6a80;
+  --muted2: #8090a8;
 
   /* rarity */
   --r-consumer: #b0c3d9;
@@ -41,9 +41,32 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 
 /* Glow utilities */
-.glow-purple { box-shadow: 0 0 20px var(--neon-glow); }
-.glow-gold { box-shadow: 0 0 20px var(--gold-glow); }
+.glow-neon { box-shadow: 0 0 24px var(--neon-glow); }
+.glow-gold { box-shadow: 0 0 24px var(--gold-glow); }
 .text-glow { text-shadow: 0 0 20px var(--neon2); }
+
+/* Smooth card hover — use CSS instead of inline JS handlers */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  will-change: transform;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+}
+
+/* Float bar */
+.float-bar-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border2);
+  overflow: hidden;
+}
+.float-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #22c55e, #eab308, #f97316, #ef4444);
+  transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
 
 /* Animated gradient border */
 @keyframes border-spin {
@@ -68,6 +91,28 @@ body {
 }
 .ticker-wrap { animation: ticker 35s linear infinite; }
 .ticker-wrap:hover { animation-play-state: paused; }
+
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Nav active underline */
+.nav-link-active {
+  color: var(--text) !important;
+  position: relative;
+}
+.nav-link-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 2px;
+  background: var(--neon);
+  border-radius: 1px;
+}
 
 /* Case spin */
 @keyframes reel-spin {
@@ -122,33 +167,35 @@ body {
 
 /* Neon button */
 .btn-neon {
-  background: linear-gradient(135deg, var(--neon), #4f46e5);
+  background: linear-gradient(135deg, var(--neon), #ea580c);
   color: white;
   font-weight: 700;
   border: none;
-  transition: all 0.2s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   position: relative;
   overflow: hidden;
+  will-change: transform;
 }
 .btn-neon::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.15s;
 }
 .btn-neon:hover::after { opacity: 1; }
-.btn-neon:hover { box-shadow: 0 0 25px var(--neon-glow); transform: translateY(-1px); }
+.btn-neon:hover { box-shadow: 0 0 28px var(--neon-glow); transform: translateY(-1px); }
 .btn-neon:active { transform: translateY(0); }
 
 .btn-gold {
   background: linear-gradient(135deg, var(--gold), #d97706);
   color: #000;
   font-weight: 700;
-  transition: all 0.2s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  will-change: transform;
 }
-.btn-gold:hover { box-shadow: 0 0 25px var(--gold-glow); transform: translateY(-1px); }
+.btn-gold:hover { box-shadow: 0 0 28px var(--gold-glow); transform: translateY(-1px); }
 .btn-gold:active { transform: translateY(0); }
 
 .btn-outline {
@@ -156,6 +203,6 @@ body {
   border: 1px solid var(--border2);
   color: var(--muted2);
   font-weight: 600;
-  transition: all 0.2s;
+  transition: border-color 0.15s, color 0.15s;
 }
 .btn-outline:hover { border-color: var(--neon); color: var(--text); }

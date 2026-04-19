@@ -14,13 +14,14 @@ const WEAR_ABBR: Record<string, string> = {
 
 export interface CS2Skin {
   id: string;
-  name: string;       // e.g. "AK-47 | Redline"
-  wear: string;       // e.g. "Field-Tested"
-  rarity: string;     // e.g. "Classified"
+  name: string;
+  wear: string;
+  rarity: string;
   rarityColor: string;
-  price: number;      // USD
+  price: number;
   imageUrl: string;
   stattrak: boolean;
+  float: number;
 }
 
 export interface CS2Case {
@@ -33,8 +34,8 @@ export interface CS2Case {
 
 // ─── Price cache ────────────────────────────────────────────────────────────────
 
-const priceCache = new Map<string, { price: number; ts: number }>();
-const PRICE_TTL = 6 * 60 * 60 * 1000; // 6h
+export const priceCache = new Map<string, { price: number; ts: number }>();
+const PRICE_TTL = 2 * 60 * 60 * 1000; // 2h — refresh market prices every 2h
 const requestQueue: Array<() => Promise<void>> = [];
 let processing = false;
 
@@ -80,6 +81,19 @@ const CASES_TTL = 24 * 60 * 60 * 1000; // 24h
 
 const WEAR_STATES = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
 
+const FLOAT_RANGES: Record<string, [number, number]> = {
+  "Factory New":    [0.000, 0.070],
+  "Minimal Wear":   [0.070, 0.150],
+  "Field-Tested":   [0.150, 0.380],
+  "Well-Worn":      [0.380, 0.450],
+  "Battle-Scarred": [0.450, 1.000],
+};
+
+function randomFloat(wear: string): number {
+  const [min, max] = FLOAT_RANGES[wear] ?? [0, 1];
+  return parseFloat((Math.random() * (max - min) + min).toFixed(6));
+}
+
 // Opening price based on case name / value
 function caseOpenPrice(name: string): number {
   if (name.includes("Glove") || name.includes("Chroma 3") || name.includes("Fracture")) return 4.99;
@@ -104,9 +118,10 @@ async function buildCases(): Promise<CS2Case[]> {
           wear,
           rarity: s.rarity?.name ?? "Mil-Spec Grade",
           rarityColor: s.rarity?.color ?? "#4b69ff",
-          price: 0,   // filled later
+          price: 0,
           imageUrl: s.image ?? "",
           stattrak: false,
+          float: randomFloat(wear),
         }));
       });
 
@@ -119,6 +134,7 @@ async function buildCases(): Promise<CS2Case[]> {
         price: 0,
         imageUrl: s.image ?? "",
         stattrak: false,
+        float: randomFloat("Factory New"),
       }));
 
       return {

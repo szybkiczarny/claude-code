@@ -9,15 +9,27 @@ import Navbar from "@/components/Navbar";
 import CaseCarousel from "@/components/CaseCarousel";
 import RewardModal from "@/components/RewardModal";
 import type { Skin, Case } from "@/lib/mock-data";
-import { weightedRandom, getRarityWeight } from "@/lib/odds";
+import { getRarityWeight } from "@/lib/odds";
+import { openCase, type BucketKey, BUCKETS } from "@/lib/case-logic";
+import type { CS2Skin } from "@/lib/cs2-data";
 import { useGameStore } from "@/lib/store";
 
 type Phase = "idle" | "spinning" | "done";
 
-function pickWinner(items: Skin[]): Skin {
-  const pool = items.map(item => ({ item, weight: getRarityWeight(item.rarity) }));
-  return weightedRandom(pool);
-}
+const BUCKET_LABELS: Record<BucketKey, string> = {
+  LOSS:       "Słaby drop",
+  RETURN:     "Zwrot",
+  MID_PROFIT: "Średni profit",
+  BIG_WIN:    "Duża wygrana!",
+  JACKPOT:    "JACKPOT!!!",
+};
+const BUCKET_COLORS: Record<BucketKey, string> = {
+  LOSS:       "#5a6a80",
+  RETURN:     "#22c55e",
+  MID_PROFIT: "#f59e0b",
+  BIG_WIN:    "#f97316",
+  JACKPOT:    "#ffd700",
+};
 
 export default function CasePage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +37,7 @@ export default function CasePage() {
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<Phase>("idle");
   const [winner, setWinner] = useState<Skin | null>(null);
+  const [winnerBucket, setWinnerBucket] = useState<BucketKey | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
@@ -32,13 +45,23 @@ export default function CasePage() {
     useGameStore();
 
   useEffect(() => {
+    // First load — instant (cached prices only)
     fetch(`/api/cs2/cases/${id}`)
       .then(r => r.json())
       .then(data => {
-        // Normalize: map skins → items for compat
         if (data.skins) data.items = data.skins;
         setCaseData(data);
         setLoading(false);
+        // After 8s refresh prices silently (background fetch will have populated cache)
+        setTimeout(() => {
+          fetch(`/api/cs2/cases/${id}`)
+            .then(r => r.json())
+            .then(updated => {
+              if (updated.skins) updated.items = updated.skins;
+              setCaseData(updated);
+            })
+            .catch(() => null);
+        }, 8000);
       })
       .catch(() => setLoading(false));
   }, [id]);
@@ -66,9 +89,10 @@ export default function CasePage() {
     if (caseData.price > 0 && !deductBalance(caseData.price * quantity)) return;
     if (caseData.price > 0)
       addTransaction({ type: "open", label: `Otwarto: ${caseData.name}`, amount: -(caseData.price * quantity), caseName: caseData.name });
-    const w = pickWinner(items);
+    const result = openCase(items as unknown as CS2Skin[], caseData.price);
     incrementNonce();
-    setWinner(w);
+    setWinner(result.skin as unknown as Skin);
+    setWinnerBucket(result.bucket);
     setPhase("spinning");
   };
 
@@ -92,7 +116,7 @@ export default function CasePage() {
     reset();
   };
 
-  const reset = () => { setPhase("idle"); setWinner(null); };
+  const reset = () => { setPhase("idle"); setWinner(null); setWinnerBucket(null); };
 
   // De-duplicate by name for display in odds table
   const uniqueSkins = items.filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i);
@@ -132,6 +156,20 @@ export default function CasePage() {
         {(phase === "spinning" || phase === "done") && winner && (
           <div className="mb-6">
             <CaseCarousel items={items} winner={winner} spinning={phase === "spinning"} onDone={handleDone} />
+            {phase === "done" && winnerBucket && (
+              <div className="flex justify-center mt-3">
+                <div className="px-4 py-1.5 rounded-full text-xs font-black tracking-wider"
+                  style={{
+                    background: `${BUCKET_COLORS[winnerBucket]}22`,
+                    color: BUCKET_COLORS[winnerBucket],
+                    border: `1px solid ${BUCKET_COLORS[winnerBucket]}55`,
+                  }}>
+                  {BUCKET_LABELS[winnerBucket]}
+                  {" · "}
+                  {(BUCKETS[winnerBucket].chance * 100).toFixed(3)}% szansy
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -196,7 +234,7 @@ export default function CasePage() {
               const pct = ((w / totalW) * 100).toFixed(1);
               return (
                 <div key={skin.id}
-                  className="rounded-xl border p-2 text-center transition-all hover:-translate-y-0.5"
+                  className="rounded-xl border p-2 text-center card-hover"
                   style={{ background: "var(--card)", borderColor: `${c}44`, borderTop: `2px solid ${c}` }}>
                   <div className="relative w-full h-16 mb-1">
                     {skin.imageUrl ? (
@@ -209,6 +247,17 @@ export default function CasePage() {
                     {skin.name.split(" | ")[1] ?? skin.name}
                   </div>
                   <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{skin.wear}</div>
+                  {/* Float bar */}
+                  {(skin as any).float !== undefined && (
+                    <div className="mt-1.5 px-1">
+                      <div className="float-bar-track">
+                        <div className="float-bar-fill" style={{ width: `${((skin as any).float) * 100}%` }} />
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: "var(--muted)", fontSize: "9px" }}>
+                        {((skin as any).float as number).toFixed(4)}
+                      </div>
+                    </div>
+                  )}
                   <div className="text-xs font-black mt-1" style={{ color: c }}>
                     {skin.price > 0 ? `$${skin.price.toFixed(2)}` : "..."}
                   </div>
@@ -233,6 +282,8 @@ export default function CasePage() {
 
       <RewardModal
         skin={showModal ? winner : null}
+        bucket={winnerBucket ? BUCKET_LABELS[winnerBucket] : null}
+        bucketColor={winnerBucket ? BUCKET_COLORS[winnerBucket] : undefined}
         onSell={handleSell}
         onKeep={handleKeep}
         onClose={() => { setShowModal(false); reset(); }}

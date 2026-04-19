@@ -4,13 +4,14 @@
 export interface Skin {
   id: string;
   name: string;
-  wear: string;        // "Factory New" | "Minimal Wear" | "Field-Tested" | "Well-Worn" | "Battle-Scarred"
-  exterior?: string;   // alias for wear (legacy)
+  wear: string;
+  exterior?: string;
   rarity: string;
   rarityColor: string;
   price: number;
   imageUrl: string;
   stattrak?: boolean;
+  float?: number;
 }
 
 export interface Case {

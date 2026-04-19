@@ -8,12 +8,14 @@ import type { Skin } from "@/lib/mock-data";
 
 interface Props {
   skin: Skin | null;
+  bucket?: string | null;
+  bucketColor?: string;
   onSell: (skin: Skin) => void;
   onKeep: (skin: Skin) => void;
   onClose: () => void;
 }
 
-export default function RewardModal({ skin, onSell, onKeep, onClose }: Props) {
+export default function RewardModal({ skin, bucket, bucketColor, onSell, onKeep, onClose }: Props) {
   if (!skin) return null;
 
   const color = skin.rarityColor ?? rarityColor(skin.rarity);
@@ -57,13 +59,20 @@ export default function RewardModal({ skin, onSell, onKeep, onClose }: Props) {
           </div>
 
           <motion.div
-            className="relative text-xs uppercase tracking-widest font-black mb-3"
-            style={{ color }}
+            className="flex items-center justify-center gap-2 mb-3"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
           >
-            🎉 WYGRAŁEŚ!
+            <span className="text-xs uppercase tracking-widest font-black" style={{ color }}>
+              🎉 WYGRAŁEŚ!
+            </span>
+            {bucket && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                style={{ background: `${bucketColor ?? color}22`, color: bucketColor ?? color, border: `1px solid ${bucketColor ?? color}44` }}>
+                {bucket}
+              </span>
+            )}
           </motion.div>
 
           <motion.div
@@ -87,13 +96,24 @@ export default function RewardModal({ skin, onSell, onKeep, onClose }: Props) {
             <h2 className="text-xl font-black mb-1" style={{ color: "var(--text)" }}>
               {skin.name}
             </h2>
-            <div className="flex items-center justify-center gap-2 mb-1">
+            <div className="flex items-center justify-center gap-2 mb-2">
               <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                 style={{ background: `${color}22`, color, border: `1px solid ${color}44` }}>
                 {skin.rarity}
               </span>
               <span className="text-xs" style={{ color: "var(--muted)" }}>{skin.wear ?? skin.exterior}</span>
             </div>
+            {/* Float */}
+            {(skin as any).float !== undefined && (
+              <div className="mx-auto w-48 mb-1">
+                <div className="float-bar-track">
+                  <div className="float-bar-fill" style={{ width: `${((skin as any).float as number) * 100}%` }} />
+                </div>
+                <div className="text-xs mt-1" style={{ color: "var(--muted)", fontSize: "10px" }}>
+                  Float: {((skin as any).float as number).toFixed(6)}
+                </div>
+              </div>
+            )}
             <p className="text-3xl font-black mt-3 mb-6" style={{ color }}>
               ${skin.price.toFixed(2)}
             </p>

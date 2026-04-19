@@ -63,6 +63,13 @@ function SkinCard({ skin, isWinner }: { skin: Skin; isWinner: boolean }) {
       <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
         {skin.wear ?? skin.exterior}
       </div>
+      {skin.float !== undefined && (
+        <div className="mt-1 px-1">
+          <div className="float-bar-track">
+            <div className="float-bar-fill" style={{ width: `${skin.float * 100}%` }} />
+          </div>
+        </div>
+      )}
       <div className="text-xs font-black mt-1" style={{ color: c }}>
         ${skin.price > 0 ? skin.price.toFixed(2) : "..."}
       </div>
@@ -84,8 +91,8 @@ export default function CaseCarousel({ items, winner, onDone, spinning }: Props)
 
     x.set(0);
     animate(x, target, {
-      duration: 5,
-      ease: [0.08, 0.82, 0.17, 1],
+      duration: 4.2,
+      ease: [0.05, 0.9, 0.1, 1],
       onComplete: () => {
         setDone(true);
         onDone();

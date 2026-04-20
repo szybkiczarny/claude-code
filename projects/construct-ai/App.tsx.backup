@@ -1,0 +1,100 @@
+import { Component, useState } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Text, View, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import ProjectsScreen from './src/screens/ProjectsScreen';
+import RecordingScreen from './src/screens/RecordingScreen';
+import ReportsScreen from './src/screens/ReportsScreen';
+
+// ---------------------------------------------------------------------------
+// ErrorBoundary — catches render-time JS errors and shows the real message
+// instead of Expo Go's generic "Something went wrong, sorry about that" screen.
+// Must be a class component (React hooks cannot be used in error boundaries).
+// ---------------------------------------------------------------------------
+interface ErrorBoundaryState { hasError: boolean; error: Error | null }
+
+class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ErrorBoundary]', error.message, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={errorStyles.container}>
+          <Text style={errorStyles.title}>Błąd aplikacji</Text>
+          <Text style={errorStyles.subtitle}>{this.state.error?.message}</Text>
+          <ScrollView style={errorStyles.scroll}>
+            <Text style={errorStyles.stack}>{this.state.error?.stack}</Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const errorStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#111', padding: 24, paddingTop: 60 },
+  title: { color: '#E53935', fontSize: 20, fontWeight: '800', marginBottom: 8 },
+  subtitle: { color: '#F5F5F5', fontSize: 14, marginBottom: 16 },
+  scroll: { flex: 1 },
+  stack: { color: '#9E9E9E', fontSize: 11, lineHeight: 18, fontFamily: 'monospace' },
+});
+
+// ---------------------------------------------------------------------------
+
+const Tab = createBottomTabNavigator();
+
+export default function App() {
+  const [selectedProject, setSelectedProject] = useState<{ id: string; name: string } | null>(null);
+
+  return (
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Tab.Navigator
+            screenOptions={{
+              headerShown: false,
+              tabBarStyle: { backgroundColor: '#111', borderTopColor: '#2C2C2C', height: 60 },
+              tabBarActiveTintColor: '#F5A623',
+              tabBarInactiveTintColor: '#555',
+              tabBarLabelStyle: { fontSize: 11, marginBottom: 4 },
+            }}
+          >
+            <Tab.Screen
+              name="Projekty"
+              options={{ tabBarIcon: () => <Text style={{ fontSize: 22 }}>🏗️</Text> }}
+            >
+              {() => <ProjectsScreen onSelect={(id, name) => setSelectedProject({ id, name })} />}
+            </Tab.Screen>
+
+            <Tab.Screen
+              name="Nagraj"
+              options={{ tabBarIcon: () => <Text style={{ fontSize: 22 }}>🎙️</Text> }}
+            >
+              {() => <RecordingScreen projectId={selectedProject?.id ?? ''} />}
+            </Tab.Screen>
+
+            <Tab.Screen
+              name="Raporty"
+              options={{ tabBarIcon: () => <Text style={{ fontSize: 22 }}>📋</Text> }}
+            >
+              {() => <ReportsScreen projectId={selectedProject?.id ?? ''} projectName={selectedProject?.name} />}
+            </Tab.Screen>
+          </Tab.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </ErrorBoundary>
+  );
+}

@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "construct-ai",
+    "slug": "construct-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "Aplikacja potrzebuje kamery do zdjęć usterek." }],
+      ["expo-av", { "microphonePermission": "Aplikacja potrzebuje mikrofonu do nagrywania raportów." }]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Aplikacja potrzebuje kamery do zdjęć usterek.",
+        "NSMicrophoneUsageDescription": "Aplikacja potrzebuje mikrofonu do nagrywania raportów."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": ["CAMERA", "RECORD_AUDIO"],
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

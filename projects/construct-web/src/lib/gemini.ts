@@ -8,6 +8,20 @@ Zwróć TYLKO poprawny JSON (bez komentarzy, bez markdown):
   "location": "lokalizacja z nagrania (np. 'Sekcja B, 2. piętro') lub null",
   "weather": "warunki pogodowe jeśli wspomniano lub null",
   "workers_count": liczba_pracowników_lub_null,
+  "crew": [
+    {
+      "role": "zawód / rola (np. 'Murarz', 'Elektryk', 'Operator dźwigu')",
+      "company": "nazwa firmy lub podwykonawcy lub null",
+      "count": liczba_osób
+    }
+  ],
+  "materials": [
+    {
+      "name": "nazwa materiału (np. 'Beton C25/30', 'Cegła klinkierowa')",
+      "qty": "ilość z jednostką (np. '12 m3', '500 szt') lub null",
+      "delivery": "data lub opis dostawy lub null"
+    }
+  ],
   "defects": [
     {
       "description": "opis usterki",
@@ -28,6 +42,8 @@ Zwróć TYLKO poprawny JSON (bez komentarzy, bez markdown):
 }
 
 Zasady:
+- Wyciągaj ekipę: każda wzmianka o grupie pracowników (np. "5 murarzy z firmy ABC") = wpis w crew
+- Wyciągaj materiały: każda wzmianka o dostawie lub użyciu materiału = wpis w materials
 - severity "critical" = zagrożenie bezpieczeństwa lub blokuje postęp prac
 - severity "high" = ważna usterka wymagająca szybkiej reakcji
 - severity "medium" = standardowa usterka
@@ -46,6 +62,8 @@ export async function extractReportData(transcript: string): Promise<{
     deadline: string | null;
     action: string;
   }>;
+  crew: Array<{ role: string; company: string | null; count: number }>;
+  materials: Array<{ name: string; qty: string | null; delivery: string | null }>;
   weather: string | null;
   workers_count: number | null;
   next_steps: string[];

@@ -1,49 +1,89 @@
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY!;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY!;
 
-const SYSTEM_PROMPT = `Jesteś asystentem do tworzenia raportów budowlanych.
-Na podstawie transkrypcji głosowej inżyniera wyciągnij ustrukturyzowane dane w formacie JSON.
+const SYSTEM_PROMPT = `Jesteś asystentem kierownika budowy. Analizujesz transkrypcje głosowe z placu budowy i wyciągasz ustrukturyzowane dane.
 
-Zwróć TYLKO JSON bez żadnych komentarzy:
+Zwróć TYLKO poprawny JSON (bez komentarzy, bez markdown):
 {
-  "summary": "krótkie podsumowanie (2-3 zdania)",
+  "summary": "zwięzłe podsumowanie inspekcji (2-3 zdania, po polsku)",
+  "location": "lokalizacja z nagrania (np. 'Sekcja B, 2. piętro') lub null",
+  "weather": "warunki pogodowe jeśli wspomniano lub null",
+  "workers_count": liczba_pracowników_lub_null,
+  "crew": [
+    {
+      "role": "zawód / rola (np. 'Murarz', 'Elektryk', 'Operator dźwigu')",
+      "company": "nazwa firmy lub podwykonawcy lub null",
+      "count": liczba_osób
+    }
+  ],
+  "materials": [
+    {
+      "name": "nazwa materiału (np. 'Beton C25/30', 'Cegła klinkierowa')",
+      "qty": "ilość z jednostką (np. '12 m3', '500 szt') lub null",
+      "delivery": "data lub opis dostawy lub null"
+    }
+  ],
   "defects": [
     {
       "description": "opis usterki",
       "severity": "low|medium|high|critical",
-      "location": "lokalizacja na budowie"
+      "location": "dokładna lokalizacja usterki",
+      "subcontractor": "nazwa podwykonawcy odpowiedzialnego lub null",
+      "deadline": "termin naprawy w formacie YYYY-MM-DD lub null",
+      "action": "co dokładnie trzeba zrobić"
     }
   ],
-  "weather": "warunki pogodowe jeśli wspomniano",
-  "workers_count": liczba pracowników jeśli wspomniano lub null,
-  "next_steps": ["lista działań do podjęcia"]
+  "next_steps": ["lista działań do podjęcia"],
+  "notifications": [
+    {
+      "recipient": "nazwa firmy lub podwykonawcy",
+      "message": "gotowa wiadomość do wysłania po polsku"
+    }
+  ]
 }`;
 
 export async function extractReportData(transcript: string): Promise<{
   summary: string;
-  defects: Array<{ description: string; severity: string; location: string }>;
+  location: string | null;
+  defects: Array<{
+    description: string;
+    severity: string;
+    location: string;
+    subcontractor: string | null;
+    deadline: string | null;
+    action: string;
+  }>;
+  crew: Array<{ role: string; company: string | null; count: number }>;
+  materials: Array<{ name: string; qty: string | null; delivery: string | null }>;
   weather: string | null;
   workers_count: number | null;
   next_steps: string[];
+  notifications: Array<{ recipient: string; message: string }>;
 }> {
-  const response = await fetch(GEMINI_URL, {
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
-      contents: [
-        { role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\nTranskrypcja:\n${transcript}` }] }
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Dzisiaj jest ${today}. Jutro to ${tomorrow}.\n\nTranskrypcja:\n${transcript}` },
       ],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+      temperature: 0.1,
+      max_tokens: 2048,
     }),
   });
 
-  if (!response.ok) throw new Error(`Gemini error: ${response.status}`);
+  if (!response.ok) throw new Error(`Groq LLM error: ${response.status}`);
 
   const data = await response.json();
-  const text = data.candidates[0].content.parts[0].text;
-
+  const text = data.choices[0].message.content;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Gemini nie zwrócił JSON');
-
+  if (!jsonMatch) throw new Error('Brak JSON w odpowiedzi');
   return JSON.parse(jsonMatch[0]);
 }

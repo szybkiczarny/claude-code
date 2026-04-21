@@ -1,5 +1,12 @@
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { Icons } from '../components/Icons';
+
+const T = {
+  bg: '#0B1729', surface: '#142338', line: '#24385A',
+  text: '#F2F5FA', textMid: '#9AA9C2', textDim: '#667690',
+  primary: '#F6B93B', primaryInk: '#1A1205', danger: '#FF5A5F',
+};
 
 interface Props {
   defectId: string;
@@ -16,12 +23,13 @@ export default function CameraPage({ defectId, onDone, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
       .then((stream) => {
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
       })
-      .catch(() => setError('Brak dostępu do aparatu'));
+      .catch(() => setError('Brak dostępu do aparatu. Zezwól w ustawieniach przeglądarki.'));
     return () => streamRef.current?.getTracks().forEach(t => t.stop());
   }, []);
 
@@ -34,6 +42,16 @@ export default function CameraPage({ defectId, onDone, onCancel }: Props) {
     canvas.getContext('2d')!.drawImage(video, 0, 0);
     setCaptured(canvas.toDataURL('image/jpeg', 0.85));
     streamRef.current?.getTracks().forEach(t => t.stop());
+  };
+
+  const retake = () => {
+    setCaptured(null);
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      .then((stream) => {
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      });
   };
 
   const upload = async () => {
@@ -62,51 +80,113 @@ export default function CameraPage({ defectId, onDone, onCancel }: Props) {
   };
 
   if (error) return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-gray-900 px-6 gap-4">
-      <span className="text-4xl">📷</span>
-      <p className="text-white text-center">{error}</p>
-      <button onClick={onCancel} className="bg-white text-gray-900 rounded-xl px-6 py-3 font-semibold">Wróć</button>
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100dvh',
+      alignItems: 'center', justifyContent: 'center',
+      background: '#000', gap: 20, padding: '0 24px',
+    }}>
+      <Icons.Camera size={52} style={{ color: T.textMid }} />
+      <p style={{ color: T.text, textAlign: 'center', fontSize: 15, fontWeight: 600 }}>{error}</p>
+      <button onClick={onCancel} style={{
+        padding: '14px 32px', borderRadius: 14, background: T.surface,
+        color: T.text, border: `1px solid ${T.line}`, fontWeight: 600, cursor: 'pointer', fontSize: 15,
+      }}>Wróć</button>
     </div>
   );
 
   return (
-    <div className="flex flex-col flex-1 bg-gray-900" style={{ height: '100dvh' }}>
-      <div className="flex items-center gap-3 px-5 pt-14 pb-3">
-        <button onClick={onCancel} className="text-white text-sm">Anuluj</button>
-        <p className="flex-1 text-center text-white font-semibold">Zdjęcie usterki</p>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#000' }}>
+
+      {/* Top bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '52px 20px 12px',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+      }}>
+        <button onClick={onCancel} style={{
+          width: 44, height: 44, borderRadius: 12,
+          background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)',
+          border: 'none', color: '#fff', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icons.X size={22} />
+        </button>
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>
+          Zdjęcie usterki
+        </span>
+        <div style={{ width: 44 }} />
       </div>
 
-      <div className="flex-1 relative overflow-hidden">
+      {/* Viewfinder */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {!captured ? (
-          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <img src={captured} alt="Podgląd" className="w-full h-full object-cover" />
+          <img src={captured} alt="Podgląd" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
+
+        {/* Focus grid overlay */}
+        {!captured && (
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              width: 180, height: 180, borderRadius: 8,
+              border: '1.5px solid rgba(255,255,255,0.4)',
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.15)',
+            }} />
+          </div>
         )}
       </div>
 
-      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      <div className="px-6 py-6 flex items-center justify-center gap-8">
+      {/* Bottom controls */}
+      <div style={{
+        padding: '24px 32px 40px',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32,
+      }}>
         {!captured ? (
-          <button
-            onClick={capture}
-            className="w-18 h-18 rounded-full bg-white border-4 border-gray-400 active:scale-95 transition-transform"
-            style={{ width: 72, height: 72 }}
-          />
+          <>
+            <div style={{ width: 56 }} />
+            {/* Shutter */}
+            <button onClick={capture} style={{
+              width: 76, height: 76, borderRadius: '50%',
+              background: '#fff', border: '5px solid rgba(255,255,255,0.4)',
+              cursor: 'pointer', padding: 0,
+              boxShadow: '0 0 0 3px rgba(255,255,255,0.2)',
+            }} />
+            <div style={{ width: 56 }} />
+          </>
         ) : (
           <>
-            <button
-              onClick={() => { setCaptured(null); }}
-              className="flex-1 bg-gray-700 text-white rounded-2xl py-4 font-semibold"
-            >
-              Ponów
+            {/* Ponów */}
+            <button onClick={retake} style={{
+              flex: 1, padding: '16px', borderRadius: 14,
+              background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff', fontWeight: 700, fontSize: 15,
+              fontFamily: 'inherit', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <Icons.X size={18} /> Ponów
             </button>
-            <button
-              onClick={upload}
-              disabled={uploading}
-              className="flex-1 bg-blue-600 text-white rounded-2xl py-4 font-semibold disabled:opacity-50"
-            >
-              {uploading ? 'Wysyłam...' : 'Zapisz'}
+            {/* Zapisz */}
+            <button onClick={upload} disabled={uploading} style={{
+              flex: 1, padding: '16px', borderRadius: 14,
+              background: uploading ? 'rgba(246,185,59,0.6)' : T.primary,
+              border: 'none', color: T.primaryInk,
+              fontWeight: 700, fontSize: 15, fontFamily: 'inherit',
+              cursor: uploading ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              {uploading
+                ? <><div className="w-4 h-4 border-2 border-app-ink border-t-transparent rounded-full animate-spin" /> Wysyłam…</>
+                : <><Icons.Check size={18} /> Zapisz</>
+              }
             </button>
           </>
         )}

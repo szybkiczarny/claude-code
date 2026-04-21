@@ -8,9 +8,10 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #0B1729;
   overscroll-behavior: none;
+  color: #F2F5FA;
 }
 
 #root {
@@ -19,6 +20,6 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  box-shadow: 0 0 40px rgba(0,0,0,0.08);
+  background: #0B1729;
+  box-shadow: 0 0 80px rgba(0,0,0,0.6);
 }

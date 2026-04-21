@@ -13,8 +13,19 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
-      ["expo-camera", { "cameraPermission": "Aplikacja potrzebuje kamery do zdjęć usterek." }],
-      ["expo-av", { "microphonePermission": "Aplikacja potrzebuje mikrofonu do nagrywania raportów." }]
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Aplikacja potrzebuje kamery do zdjęć usterek."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Aplikacja potrzebuje mikrofonu do nagrywania raportów."
+        }
+      ],
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true,
@@ -28,7 +39,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["CAMERA", "RECORD_AUDIO"],
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },

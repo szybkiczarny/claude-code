@@ -14,7 +14,7 @@ export const DEMO_REPORTS: Report[] = [
     transcript: null,
     ai_summary: 'Inspekcja 3. piętra — stwierdzono pęknięcia tynku przy osi C oraz opóźnienie w montażu instalacji elektrycznej. Pracownicy: 12 osób. Warunki pogodowe dobre.',
     weather: 'Słonecznie, 18°C',
-    status: 'done',
+    status: 'done', lat: null, lng: null,
     created_at: new Date(Date.now() - 3600000).toISOString(),
   },
   {
@@ -23,7 +23,7 @@ export const DEMO_REPORTS: Report[] = [
     transcript: null,
     ai_summary: 'Kontrola fundamentów skrzydła B. Wszystkie elementy zgodne z projektem. Zalecono dodatkowe uszczelnienie przy dylatacji.',
     weather: 'Pochmurno, 12°C',
-    status: 'done',
+    status: 'done', lat: null, lng: null,
     created_at: new Date(Date.now() - 86400000).toISOString(),
   },
 ];

@@ -6,6 +6,7 @@ export interface Project {
   address: string;
   client_name: string | null;
   status: 'active' | 'completed' | 'paused';
+  manager_id: string | null;
   created_at: string;
 }
 
@@ -19,6 +20,29 @@ export interface Report {
   pdf_url: string | null;
   weather: string | null;
   status: 'draft' | 'processing' | 'done' | 'failed';
+  lat: number | null;
+  lng: number | null;
+  created_at: string;
+}
+
+export interface CrewEntry {
+  id: string;
+  project_id: string;
+  report_id: string | null;
+  role: string;
+  company: string | null;
+  count: number;
+  recorded_at: string;
+  created_at: string;
+}
+
+export interface MaterialEntry {
+  id: string;
+  project_id: string;
+  report_id: string | null;
+  name: string;
+  qty: string | null;
+  delivery: string | null;
   created_at: string;
 }
 

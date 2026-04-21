@@ -33,32 +33,34 @@ export default function AuthPage() {
   };
 
   if (done) return (
-    <div className="flex flex-col flex-1 items-center justify-center px-6 bg-white">
+    <div className="flex flex-col flex-1 items-center justify-center px-6 bg-app-bg">
       <div className="text-5xl mb-4">📧</div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">Sprawdź email</h2>
-      <p className="text-sm text-gray-500 text-center">
-        Wysłaliśmy link potwierdzający na <strong>{email}</strong>.<br />
+      <h2 className="text-xl font-bold text-app-text mb-2">Sprawdź email</h2>
+      <p className="text-sm text-app-mid text-center">
+        Wysłaliśmy link potwierdzający na <strong className="text-app-text">{email}</strong>.<br />
         Kliknij go, żeby aktywować konto.
       </p>
     </div>
   );
 
+  const inputCls = 'w-full bg-app-hi border border-app-line rounded-2xl px-4 py-3 text-sm text-app-text placeholder-app-dim focus:outline-none focus:ring-2 focus:ring-app-primary';
+
   return (
-    <div className="flex flex-col flex-1 bg-white">
-      <div className="bg-blue-600 px-6 pt-16 pb-10">
+    <div className="flex flex-col flex-1 bg-app-bg">
+      <div className="bg-app-surface px-6 pt-16 pb-10 border-b border-app-line">
         <div className="text-4xl mb-3">🏗️</div>
-        <h1 className="text-2xl font-bold text-white">ConstructAI</h1>
-        <p className="text-blue-200 text-sm mt-1">Raporty budowlane z AI</p>
+        <h1 className="text-2xl font-bold text-app-text">ConstructAI</h1>
+        <p className="text-app-mid text-sm mt-1">Raporty budowlane z AI</p>
       </div>
 
       <div className="flex-1 px-6 pt-8">
-        <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
+        <div className="flex bg-app-hi rounded-2xl p-1 mb-6">
           {(['login', 'register'] as const).map((m) => (
             <button
               key={m}
               onClick={() => { setMode(m); setError(null); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                mode === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                mode === m ? 'bg-app-surface text-app-text shadow-sm' : 'text-app-dim'
               }`}
             >
               {m === 'login' ? 'Logowanie' : 'Rejestracja'}
@@ -69,45 +71,27 @@ export default function AuthPage() {
         <div className="space-y-4">
           {mode === 'register' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Imię i nazwisko</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Jan Kowalski"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="block text-sm font-medium text-app-mid mb-1">Imię i nazwisko</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jan Kowalski" className={inputCls} />
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="jan@firma.pl"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm font-medium text-app-mid mb-1">Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jan@firma.pl" className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hasło</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm font-medium text-app-mid mb-1">Hasło</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={inputCls} />
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</p>
+            <p className="text-sm text-app-danger bg-app-danger bg-opacity-10 border border-app-danger border-opacity-30 rounded-2xl px-4 py-3">{error}</p>
           )}
 
           <button
             onClick={submit}
             disabled={loading || !email || !password}
-            className="w-full bg-blue-600 text-white rounded-xl py-4 font-semibold text-base disabled:opacity-50 active:bg-blue-700"
+            className="w-full bg-app-primary text-app-ink rounded-2xl py-4 font-semibold text-base disabled:opacity-40 active:opacity-80 min-h-[56px]"
           >
             {loading ? '...' : mode === 'login' ? 'Zaloguj się' : 'Utwórz konto'}
           </button>

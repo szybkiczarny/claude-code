@@ -1,6 +1,13 @@
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY!;
 
-const SYSTEM_PROMPT = `Jesteś asystentem kierownika budowy. Analizujesz transkrypcje głosowe z placu budowy i wyciągasz ustrukturyzowane dane.
+const SYSTEM_PROMPT = `Jesteś asystentem kierownika budowy w Polsce. Analizujesz transkrypcje głosowe z placu budowy i wyciągasz ustrukturyzowane dane.
+
+WAŻNE — jak rozpoznawać firmy i ekipy w polskiej mowie:
+- "firma Nowacki", "ekipa Nowackiego", "Nowaccy", "podwykonawca X" → company: "Nowacki", role: "Podwykonawca"
+- "murarze z Kowalski Bud", "hydraulicy od Wodniak" → company: nazwa firmy, role: zawód
+- "ma to ogarnąć", "ma to naprawić", "odpowiada za to", "zadzwoń do X" → X to subcontractor w usterce ORAZ wpis w crew
+- "pracownicy", "robotnicy", "chłopaki" bez nazwy → role: "Robotnicy ogólni", company: null
+- Jeśli firma jest wymieniona w kontekście usterki → wpisz ją w defect.subcontractor ORAZ dodaj do crew
 
 Zwróć TYLKO poprawny JSON (bez komentarzy, bez markdown):
 {
@@ -10,9 +17,9 @@ Zwróć TYLKO poprawny JSON (bez komentarzy, bez markdown):
   "workers_count": liczba_pracowników_lub_null,
   "crew": [
     {
-      "role": "zawód / rola (np. 'Murarz', 'Elektryk', 'Operator dźwigu')",
-      "company": "nazwa firmy lub podwykonawcy lub null",
-      "count": liczba_osób
+      "role": "zawód/rola LUB 'Podwykonawca' jeśli nieznany (np. 'Murarz', 'Elektryk', 'Podwykonawca')",
+      "company": "nazwa firmy lub nazwisko — ZAWSZE wyciągaj jeśli padło jakiekolwiek nazwisko/firma",
+      "count": liczba_osób_lub_1_jeśli_nieznana
     }
   ],
   "materials": [
@@ -26,13 +33,24 @@ Zwróć TYLKO poprawny JSON (bez komentarzy, bez markdown):
     {
       "description": "opis usterki",
       "severity": "low|medium|high|critical",
-      "location": "dokładna lokalizacja usterki",
-      "subcontractor": "nazwa podwykonawcy odpowiedzialnego lub null",
+      "location": "dokładna lokalizacja usterki lub null",
+      "subcontractor": "firma/nazwisko odpowiedzialne — wyciągaj nawet z 'firma X ma to ogarnąć'",
       "deadline": "termin naprawy w formacie YYYY-MM-DD lub null",
       "action": "co dokładnie trzeba zrobić"
     }
   ],
-  "next_steps": ["lista działań do podjęcia"],
+  "progress": {
+    "percent": liczba_0_do_100_lub_null,
+    "stage": "nazwa etapu prac (np. 'Stan surowy', 'Instalacje', 'Wykończenie') lub null",
+    "note": "krótki opis postępu lub null"
+  },
+  "next_steps": [
+    {
+      "description": "co trzeba zrobić (konkretna czynność)",
+      "location": "gdzie to zrobić lub null",
+      "deadline": "termin w formacie YYYY-MM-DD lub null"
+    }
+  ],
   "notifications": [
     {
       "recipient": "nazwa firmy lub podwykonawcy",
@@ -58,6 +76,7 @@ export async function extractReportData(transcript: string): Promise<{
   workers_count: number | null;
   next_steps: string[];
   notifications: Array<{ recipient: string; message: string }>;
+  progress: { percent: number; stage: string | null; note: string | null } | null;
 }> {
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];

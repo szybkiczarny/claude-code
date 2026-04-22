@@ -19,6 +19,8 @@ import ReportsScreen from './src/screens/ReportsScreen';
 import ReportDetailScreen from './src/screens/ReportDetailScreen';
 import AddProjectScreen from './src/screens/AddProjectScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import DefectCameraScreen from './src/screens/DefectCameraScreen';
+import ContractorsScreen from './src/screens/ContractorsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -31,6 +33,8 @@ function ProjectsStack() {
       <Stack.Screen name="AddProject" component={AddProjectScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
+      <Stack.Screen name="DefectCamera" component={DefectCameraScreen} />
+      <Stack.Screen name="Contractors" component={ContractorsScreen} />
     </Stack.Navigator>
   );
 }
@@ -40,6 +44,7 @@ function RecordStack() {
     <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
       <Stack.Screen name="Recording" component={RecordingScreen} />
       <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
+      <Stack.Screen name="DefectCamera" component={DefectCameraScreen} />
     </Stack.Navigator>
   );
 }
@@ -49,6 +54,7 @@ function ReportsStack() {
     <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
       <Stack.Screen name="ReportsList" component={ReportsScreen} />
       <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
+      <Stack.Screen name="DefectCamera" component={DefectCameraScreen} />
     </Stack.Navigator>
   );
 }

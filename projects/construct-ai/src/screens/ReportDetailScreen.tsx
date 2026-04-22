@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Share, Linking, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Share, Linking, Modal, Alert, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,8 +22,18 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
   const [crew, setCrew] = useState<CrewEntry[]>([]);
   const [materials, setMaterials] = useState<MaterialEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<TabId>('defects');
   const [delegateDefect, setDelegateDefect] = useState<Defect|null>(null);
+  const [updatingDefect, setUpdatingDefect] = useState<string|null>(null);
+
+  const cycleStatus = async (d: Defect) => {
+    const next: Record<string,string> = { open:'in_progress', in_progress:'resolved', resolved:'open' };
+    setUpdatingDefect(d.id);
+    await supabase.from('defects').update({ status: next[d.status] }).eq('id', d.id);
+    setUpdatingDefect(null);
+    load();
+  };
 
   const load = async () => {
     const [{ data: r }, { data: d }, { data: c }, { data: m }] = await Promise.all([
@@ -37,9 +47,42 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
     if (c) setCrew(c);
     if (m) setMaterials(m);
     setLoading(false);
+    setRefreshing(false);
   };
 
   useFocusEffect(useCallback(()=>{ load(); },[]));
+
+  const onRefresh = () => { setRefreshing(true); load(); };
+
+  const deleteReport = () => {
+    Alert.alert('Usuń raport', 'Usunąć ten raport?\n\nTo usunie też wszystkie usterki w tym raporcie.', [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: async () => {
+        await supabase.from('reports').delete().eq('id', reportId);
+        navigation.goBack();
+      }},
+    ]);
+  };
+
+  const deleteDefect = (d: Defect) => {
+    Alert.alert('Usuń usterkę', `Usunąć "${d.description.slice(0,60)}"?`, [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: async () => {
+        await supabase.from('defects').delete().eq('id', d.id);
+        load();
+      }},
+    ]);
+  };
+
+  const deletePhoto = (d: Defect) => {
+    Alert.alert('Usuń zdjęcie', 'Usunąć zdjęcie tej usterki?', [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: async () => {
+        await supabase.from('defects').update({ photo_url: null }).eq('id', d.id);
+        load();
+      }},
+    ]);
+  };
 
   const shareReport = async () => {
     if (!report) return;
@@ -81,6 +124,9 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
         <TouchableOpacity style={s.backBtn} onPress={shareReport}>
           <Ionicons name="share-outline" size={20} color={C.primary}/>
         </TouchableOpacity>
+        <TouchableOpacity style={s.backBtn} onPress={deleteReport}>
+          <Ionicons name="trash-outline" size={18} color={C.danger}/>
+        </TouchableOpacity>
       </View>
 
       {/* Summary */}
@@ -110,7 +156,7 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={{padding:16,gap:10,paddingBottom:120}}>
+      <ScrollView contentContainerStyle={{padding:16,gap:10,paddingBottom:120}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary}/>}>
 
         {/* USTERKI */}
         {tab==='defects'&&(
@@ -121,9 +167,15 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
                 {d.photo_url&&<Image source={{uri:d.photo_url}} style={s.defectPhoto} resizeMode="cover"/>}
                 <View style={{padding:14}}>
                   <View style={s.defectTop}>
-                    <View style={[s.badge,{backgroundColor:statusColor(d.status)+'26',borderColor:statusColor(d.status)+'66'}]}>
-                      <Text style={[s.badgeText,{color:statusColor(d.status)}]}>{statusLabel(d.status)}</Text>
-                    </View>
+                    <TouchableOpacity
+                      style={[s.badge,{backgroundColor:statusColor(d.status)+'26',borderColor:statusColor(d.status)+'66'}]}
+                      onPress={()=>cycleStatus(d)}
+                    >
+                      {updatingDefect===d.id
+                        ? <ActivityIndicator size={10} color={statusColor(d.status)}/>
+                        : <Text style={[s.badgeText,{color:statusColor(d.status)}]}>{statusLabel(d.status)} ›</Text>
+                      }
+                    </TouchableOpacity>
                     <View style={[s.badge,{backgroundColor:severityColor(d.severity)+'26',borderColor:severityColor(d.severity)+'66'}]}>
                       <Text style={[s.badgeText,{color:severityColor(d.severity)}]}>{severityLabel(d.severity)}</Text>
                     </View>
@@ -132,16 +184,25 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
                   {d.location_desc&&<View style={s.defectMeta}><Ionicons name="location-outline" size={12} color={C.textMid}/><Text style={s.metaTxt}>{d.location_desc}</Text></View>}
                   {d.action&&<View style={s.defectMeta}><Ionicons name="build-outline" size={12} color={C.textMid}/><Text style={s.metaTxt}>{d.action}</Text></View>}
                 </View>
-                {(d.subcontractor||d.deadline)&&(
-                  <View style={s.defectFooter}>
-                    {d.subcontractor&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="business-outline" size={12} color={C.textMid}/><Text style={s.metaTxt}>{d.subcontractor}</Text></View>}
-                    {d.deadline&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="calendar-outline" size={12} color={C.textMid}/><Text style={s.metaTxt}>{d.deadline}</Text></View>}
-                    <View style={{flex:1}}/>
-                    <TouchableOpacity style={s.delegateBtn} onPress={()=>setDelegateDefect(d)}>
-                      <Ionicons name="send-outline" size={14} color={C.primaryInk}/>
+                <View style={s.defectFooter}>
+                  {d.subcontractor&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="business-outline" size={12} color={C.textMid}/><Text style={s.metaTxt}>{d.subcontractor}</Text></View>}
+                  {d.deadline&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="calendar-outline" size={12} color={C.textMid}/><Text style={s.metaTxt}>{d.deadline}</Text></View>}
+                  <View style={{flex:1}}/>
+                  {d.photo_url&&(
+                    <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.danger+'22',marginRight:6}]} onPress={()=>deletePhoto(d)}>
+                      <Ionicons name="image-outline" size={14} color={C.danger}/>
                     </TouchableOpacity>
-                  </View>
-                )}
+                  )}
+                  <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.surfaceHi,marginRight:6}]} onPress={()=>navigation.navigate('DefectCamera',{projectId:report.project_id,reportId:report.id})}>
+                    <Ionicons name="camera-outline" size={14} color={C.textMid}/>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.surfaceHi,marginRight:6}]} onPress={()=>setDelegateDefect(d)}>
+                    <Ionicons name="send-outline" size={14} color={C.primary}/>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.danger+'22'}]} onPress={()=>deleteDefect(d)}>
+                    <Ionicons name="trash-outline" size={14} color={C.danger}/>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
         )}
@@ -186,19 +247,45 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
       </ScrollView>
 
       {/* Delegate bottom sheet */}
-      <DelegateModal defect={delegateDefect} onClose={()=>setDelegateDefect(null)}/>
+      <DelegateModal defect={delegateDefect} report={report} onClose={()=>setDelegateDefect(null)}/>
     </View>
   );
 }
 
-function DelegateModal({ defect, onClose }: { defect: Defect|null; onClose: ()=>void }) {
+function DelegateModal({ defect, report, onClose }: { defect: Defect|null; report: any; onClose: ()=>void }) {
   if (!defect) return null;
+  const [sending, setSending] = useState(false);
   const msg = `Usterka: ${defect.description}${defect.location_desc?`. Lokalizacja: ${defect.location_desc}`:''}${defect.deadline?`. Termin: ${defect.deadline}`.replace('.',','):''}`;
   const encoded = encodeURIComponent(msg);
+
+  const sendEmail = async (email?: string) => {
+    if (!email) { Linking.openURL(`mailto:?subject=Usterka&body=${encoded}`); onClose(); return; }
+    setSending(true);
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const res = await supabase.functions.invoke('send-defect-email', {
+        body: {
+          to: email,
+          defect_description: defect.description,
+          location: defect.location_desc,
+          deadline: defect.deadline,
+          subcontractor: defect.subcontractor,
+          project_name: report?.project_name ?? '',
+        },
+      });
+      if (res.error) throw res.error;
+      Alert.alert('Wysłano!', `Email wysłany do ${email}`);
+      onClose();
+    } catch (e: any) {
+      Alert.alert('Błąd', e.message ?? 'Nie udało się wysłać');
+    }
+    setSending(false);
+  };
+
   const actions = [
     { label:'WhatsApp', icon:'logo-whatsapp' as const, color:'#25D366', onPress:()=>{ Linking.openURL(`whatsapp://send?text=${encoded}`); onClose(); } },
     { label:'SMS',      icon:'chatbubble-outline' as const, color:C.info,    onPress:()=>{ Linking.openURL(`sms:?body=${encoded}`); onClose(); } },
-    { label:'E-mail',   icon:'mail-outline' as const,       color:C.primary, onPress:()=>{ Linking.openURL(`mailto:?subject=Usterka&body=${encoded}`); onClose(); } },
+    { label:'E-mail',   icon:'mail-outline' as const,       color:C.primary, onPress:()=>sendEmail() },
     { label:'Udostępnij', icon:'share-outline' as const,    color:'#A78BFA', onPress:()=>{ Share.share({message:msg}); onClose(); } },
   ];
   return (
@@ -217,9 +304,12 @@ function DelegateModal({ defect, onClose }: { defect: Defect|null; onClose: ()=>
           )}
           <View style={s.sheetActions}>
             {actions.map(a=>(
-              <TouchableOpacity key={a.label} style={s.sheetAction} onPress={a.onPress}>
+              <TouchableOpacity key={a.label} style={[s.sheetAction,{opacity:sending?0.5:1}]} onPress={a.onPress} disabled={sending}>
                 <View style={[s.sheetIconBox,{backgroundColor:a.color+'26'}]}>
-                  <Ionicons name={a.icon} size={22} color={a.color}/>
+                  {sending && a.label==='E-mail'
+                    ? <ActivityIndicator color={a.color} size="small"/>
+                    : <Ionicons name={a.icon} size={22} color={a.color}/>
+                  }
                 </View>
                 <Text style={s.sheetActionLabel}>{a.label}</Text>
               </TouchableOpacity>

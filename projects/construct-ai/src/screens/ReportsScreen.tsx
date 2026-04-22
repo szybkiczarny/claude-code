@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,9 +19,10 @@ export default function ReportsScreen({ navigation, route }: { navigation: any; 
   const projectName: string = route?.params?.projectName ?? '';
   const [reports, setReports] = useState<ReportWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     let data: Report[]|null = null;
     if (projectId) {
       const res = await supabase.from('reports').select('*').eq('project_id',projectId).order('created_at',{ascending:false});
@@ -31,20 +32,33 @@ export default function ReportsScreen({ navigation, route }: { navigation: any; 
       if (!user) { setLoading(false); return; }
       const { data: ps } = await supabase.from('projects').select('id').eq('manager_id',user.id);
       const ids = (ps??[]).map(p=>p.id);
-      if (!ids.length) { setReports([]); setLoading(false); return; }
+      if (!ids.length) { setReports([]); setLoading(false); setRefreshing(false); return; }
       const res = await supabase.from('reports').select('*').in('project_id',ids).order('created_at',{ascending:false});
       data = res.data;
     }
-    if (!data) { setLoading(false); return; }
+    if (!data) { setLoading(false); setRefreshing(false); return; }
     const ids = data.map(r=>r.id);
     const { data: def } = ids.length ? await supabase.from('defects').select('report_id').in('report_id',ids) : { data: [] };
     const counts: Record<string,number> = {};
     for (const d of def??[]) counts[d.report_id] = (counts[d.report_id]??0)+1;
     setReports(data.map(r=>({...r, defectCount: counts[r.id]??0})));
     setLoading(false);
+    setRefreshing(false);
   };
 
   useFocusEffect(useCallback(()=>{ load(); },[]));
+
+  const onRefresh = () => { setRefreshing(true); load(true); };
+
+  const deleteReport = (r: ReportWithMeta) => {
+    Alert.alert('Usuń raport', `Usunąć raport z ${fDate(r.created_at)}?\n\nTo usunie też wszystkie usterki.`, [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: async () => {
+        await supabase.from('reports').delete().eq('id', r.id);
+        load(true);
+      }},
+    ]);
+  };
 
   const todayList = reports.filter(r=>isToday(r.created_at));
   const earlierList = reports.filter(r=>!isToday(r.created_at));
@@ -75,11 +89,12 @@ export default function ReportsScreen({ navigation, route }: { navigation: any; 
               data={[...todayList,...earlierList]}
               keyExtractor={r=>r.id}
               contentContainerStyle={{paddingHorizontal:16,paddingBottom:120,gap:10}}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary}/>}
               ListHeaderComponent={todayList.length>0?<Text style={s.sectionLabel}>DZIŚ · {todayList.length}</Text>:null}
               renderItem={({item:r,index})=>(
                 <>
                   {index===todayList.length&&earlierList.length>0&&<Text style={[s.sectionLabel,{marginTop:16}]}>WCZEŚNIEJ · {earlierList.length}</Text>}
-                  <TouchableOpacity style={s.card} onPress={()=>navigation.navigate('ReportDetail',{reportId:r.id})} activeOpacity={0.85}>
+                  <TouchableOpacity style={s.card} onPress={()=>navigation.navigate('ReportDetail',{reportId:r.id})} onLongPress={()=>deleteReport(r)} activeOpacity={0.85}>
                     <View style={s.cardInner}>
                       <View style={s.iconWrap}><Ionicons name="mic" size={24} color={C.primary}/></View>
                       <View style={{flex:1}}>

@@ -51,6 +51,37 @@ export interface CrewEntry {
   created_at: string;
 }
 
+export interface ProgressEntry {
+  id: string;
+  project_id: string;
+  report_id: string | null;
+  percent: number;
+  stage: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface Contractor {
+  id: string;
+  project_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  trade: string | null;
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  project_id: string;
+  report_id: string | null;
+  description: string;
+  location: string | null;
+  deadline: string | null;
+  status: 'todo' | 'done';
+  created_at: string;
+}
+
 export interface MaterialEntry {
   id: string;
   project_id: string;

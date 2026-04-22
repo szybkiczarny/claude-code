@@ -125,6 +125,23 @@ export default function RecordingScreen({ navigation, route }: { navigation: any
           project_id: projectId, report_id: report.id, name: m.name, qty: m.qty??null, delivery: m.delivery??null,
         })));
       }
+      if (data.progress?.percent != null) {
+        await supabase.from('progress_log').insert({
+          project_id: projectId, report_id: report.id,
+          percent: data.progress.percent,
+          stage: data.progress.stage ?? null,
+          note: data.progress.note ?? null,
+        });
+      }
+      if (data.next_steps?.length > 0) {
+        await supabase.from('tasks').insert(data.next_steps.map((t: any) => ({
+          project_id: projectId, report_id: report.id,
+          description: typeof t === 'string' ? t : t.description,
+          location: typeof t === 'object' ? (t.location??null) : null,
+          deadline: typeof t === 'object' ? (t.deadline??null) : null,
+          status: 'todo',
+        })));
+      }
 
       setSummary(data.summary);
       setDefects(data.defects??[]);

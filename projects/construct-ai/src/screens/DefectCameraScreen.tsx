@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { uploadPhoto } from '../lib/cloudinary';
+import { uploadToR2 } from '../lib/r2';
 import { supabase } from '../lib/supabase';
 
 const SEVERITY_OPTIONS = [
@@ -13,15 +13,8 @@ const SEVERITY_OPTIONS = [
 
 type Step = 'camera' | 'preview' | 'uploading' | 'done';
 
-export default function DefectCameraScreen({
-  projectId,
-  reportId,
-  onDone,
-}: {
-  projectId: string;
-  reportId: string;
-  onDone: () => void;
-}) {
+export default function DefectCameraScreen({ navigation, route }: { navigation: any; route: any }) {
+  const { projectId, reportId } = route.params;
   const [permission, requestPermission] = useCameraPermissions();
   const [step, setStep] = useState<Step>('camera');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -54,7 +47,7 @@ export default function DefectCameraScreen({
     if (!photoUri) return;
     setStep('uploading');
     try {
-      const photoUrl = await uploadPhoto(photoUri);
+      const photoUrl = await uploadToR2(photoUri, `${Date.now()}.jpg`);
       await supabase.from('defects').insert({
         project_id: projectId,
         report_id: reportId,
@@ -65,8 +58,8 @@ export default function DefectCameraScreen({
         status: 'open',
       });
       setStep('done');
-    } catch (err) {
-      Alert.alert('Błąd', 'Nie udało się zapisać zdjęcia');
+    } catch (err: any) {
+      Alert.alert('Błąd', err?.message ?? 'Nie udało się zapisać zdjęcia');
       setStep('preview');
     }
   };
@@ -133,7 +126,7 @@ export default function DefectCameraScreen({
     <View style={styles.container}>
       <Text style={{ fontSize: 48 }}>✅</Text>
       <Text style={styles.doneText}>Usterka zapisana!</Text>
-      <TouchableOpacity style={styles.btnPrimary} onPress={onDone}>
+      <TouchableOpacity style={styles.btnPrimary} onPress={() => navigation.goBack()}>
         <Text style={styles.btnText}>Gotowe</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.btnSecondary} onPress={() => { setPhotoUri(null); setStep('camera'); }}>

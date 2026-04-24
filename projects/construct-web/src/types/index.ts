@@ -46,6 +46,16 @@ export interface MaterialEntry {
   created_at: string;
 }
 
+export interface Contractor {
+  id: string;
+  manager_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  trade: string | null;
+  created_at: string;
+}
+
 export interface Defect {
   id: string;
   report_id: string;

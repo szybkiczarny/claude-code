@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { printReport } from '../lib/pdf';
 import { Icons } from '../components/Icons';
-import { Card, ScreenHeader, PhotoThumb, PriorityBar, StatusLabelChip, TradeIcon, MiniStat } from '../components/UI';
+import { Card, ScreenHeader, PhotoThumb, PriorityBar, TradeIcon, MiniStat } from '../components/UI';
 import { DelegateSheet } from '../components/DelegateSheet';
 import type { Report, Defect } from '../types';
 
@@ -12,10 +12,6 @@ const T = {
   primary: '#F6B93B', primaryInk: '#1A1205', danger: '#FF5A5F', success: '#3DDC97',
   warning: '#FFB02E',
 };
-
-function statusLabel(s: string) {
-  return s === 'open' ? 'Otwarta' : s === 'in_progress' ? 'W toku' : s === 'review' ? 'Weryfikacja' : 'Naprawiona';
-}
 
 
 interface Props {
@@ -31,7 +27,7 @@ export default function ReportDetailPage({ reportId, onBack, onAddPhoto }: Props
   const [tab, setTab] = useState<'defects' | 'transcript'>('defects');
   const [delegateFor, setDelegateFor] = useState<Defect | null>(null);
 
-  useEffect(() => {
+  const reload = () => {
     Promise.all([
       supabase.from('reports').select('*').eq('id', reportId).single(),
       supabase.from('defects').select('*').eq('report_id', reportId).order('created_at'),
@@ -40,7 +36,9 @@ export default function ReportDetailPage({ reportId, onBack, onAddPhoto }: Props
       if (d) setDefects(d);
       setLoading(false);
     });
-  }, [reportId]);
+  };
+
+  useEffect(() => { reload(); }, [reportId]);
 
   if (loading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.bg }}>
@@ -158,19 +156,58 @@ export default function ReportDetailPage({ reportId, onBack, onAddPhoto }: Props
         {tab === 'transcript' && <TranscriptView transcript={report.transcript} />}
       </div>
 
-      <DelegateSheet open={!!delegateFor} onClose={() => setDelegateFor(null)} defect={delegateFor} />
+      <DelegateSheet open={!!delegateFor} onClose={() => setDelegateFor(null)} defect={delegateFor} onAssigned={reload} />
     </div>
   );
 }
 
+const STATUS_CYCLE: Record<string, Defect['status']> = {
+  open: 'in_progress',
+  in_progress: 'resolved',
+  resolved: 'open',
+};
+
+function StatusToggle({ defect, onChanged }: { defect: Defect; onChanged: (updated: Defect) => void }) {
+  const [busy, setBusy] = useState(false);
+  const cycle = async () => {
+    if (busy) return;
+    const next = STATUS_CYCLE[defect.status];
+    setBusy(true);
+    await supabase.from('defects').update({ status: next }).eq('id', defect.id);
+    setBusy(false);
+    onChanged({ ...defect, status: next });
+  };
+  const label = defect.status === 'open' ? 'Otwarta' : defect.status === 'in_progress' ? 'W toku' : 'Naprawiona';
+  const color = defect.status === 'open' ? T.danger : defect.status === 'in_progress' ? T.warning : T.success;
+  return (
+    <button onClick={cycle} disabled={busy} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+      background: `color-mix(in oklab, ${color} 18%, transparent)`,
+      color, border: `1px solid color-mix(in oklab, ${color} 40%, transparent)`,
+      cursor: 'pointer', fontFamily: 'inherit',
+      WebkitTapHighlightColor: 'transparent',
+    }}>
+      {busy ? '…' : label}
+    </button>
+  );
+}
+
 function DefectsList({
-  defects, onAddPhoto, onDelegate,
+  defects: initialDefects, onAddPhoto, onDelegate,
 }: {
   defects: Defect[];
   onAddPhoto: (id: string) => void;
   onDelegate: (d: Defect) => void;
 }) {
+  const [defects, setDefects] = useState(initialDefects);
   const [filter, setFilter] = useState<string>('all');
+
+  useEffect(() => { setDefects(initialDefects); }, [initialDefects]);
+
+  const updateDefect = (updated: Defect) =>
+    setDefects(prev => prev.map(d => d.id === updated.id ? updated : d));
+
   const filters = [
     { id: 'all',         label: 'Wszystkie', count: defects.length },
     { id: 'open',        label: 'Otwarte',   count: defects.filter(d => d.status === 'open').length },
@@ -204,20 +241,20 @@ function DefectsList({
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {visible.map(d => <DefectCard key={d.id} defect={d} onAddPhoto={onAddPhoto} onDelegate={onDelegate} />)}
+        {visible.map(d => <DefectCard key={d.id} defect={d} onAddPhoto={onAddPhoto} onDelegate={onDelegate} onStatusChange={updateDefect} />)}
       </div>
     </>
   );
 }
 
 function DefectCard({
-  defect: d, onAddPhoto, onDelegate,
+  defect: d, onAddPhoto, onDelegate, onStatusChange,
 }: {
   defect: Defect;
   onAddPhoto: (id: string) => void;
   onDelegate: (d: Defect) => void;
+  onStatusChange: (updated: Defect) => void;
 }) {
-  const sl = statusLabel(d.status);
   const thumbKind = d.severity === 'high' || d.severity === 'critical' ? 'crack' : 'bathroom';
 
   return (
@@ -229,7 +266,7 @@ function DefectCard({
             <span style={{ fontSize: 11, color: T.textDim, fontWeight: 700, letterSpacing: 0.6 }}>{d.id.slice(0, 8)}</span>
             <PriorityBar level={d.severity} />
             <div style={{ flex: 1 }} />
-            <StatusLabelChip status={d.status} label={sl} />
+            <StatusToggle defect={d} onChanged={onStatusChange} />
           </div>
           <div style={{
             fontSize: 14, fontWeight: 700, color: T.text, lineHeight: 1.3,

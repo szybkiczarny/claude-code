@@ -1,10 +1,10 @@
 import type { Project, Report } from '../types';
 
 export const DEMO_PROJECTS: Project[] = [
-  { id: '1', name: 'Osiedle Zielona Górka', address: 'ul. Polna 12, Warszawa', client_name: 'Develia S.A.', status: 'active', created_at: new Date().toISOString() },
-  { id: '2', name: 'Centrum Handlowe Nowa Brama', address: 'al. Krakowska 45, Kraków', client_name: 'Atrium Poland', status: 'active', created_at: new Date().toISOString() },
-  { id: '3', name: 'Biurowiec Prosta Tower', address: 'ul. Prosta 20, Warszawa', client_name: 'HB Reavis', status: 'paused', created_at: new Date().toISOString() },
-  { id: '4', name: 'Hala Magazynowa Logistix', address: 'ul. Przemysłowa 3, Łódź', client_name: 'Panattoni', status: 'completed', created_at: new Date().toISOString() },
+  { id: '1', name: 'Osiedle Zielona Górka', address: 'ul. Polna 12, Warszawa', client_name: 'Develia S.A.', status: 'active', manager_id: null, created_at: new Date().toISOString() },
+  { id: '2', name: 'Centrum Handlowe Nowa Brama', address: 'al. Krakowska 45, Kraków', client_name: 'Atrium Poland', status: 'active', manager_id: null, created_at: new Date().toISOString() },
+  { id: '3', name: 'Biurowiec Prosta Tower', address: 'ul. Prosta 20, Warszawa', client_name: 'HB Reavis', status: 'paused', manager_id: null, created_at: new Date().toISOString() },
+  { id: '4', name: 'Hala Magazynowa Logistix', address: 'ul. Przemysłowa 3, Łódź', client_name: 'Panattoni', status: 'completed', manager_id: null, created_at: new Date().toISOString() },
 ];
 
 export const DEMO_REPORTS: Report[] = [

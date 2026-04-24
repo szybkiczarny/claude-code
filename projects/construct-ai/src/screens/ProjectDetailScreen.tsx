@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { C } from '../theme';
-import type { Project, Defect, Report, CrewEntry, MaterialEntry, Task, ProgressEntry } from '../types';
+import { useEffect } from 'react';
+import { geocodeAddress, fetchWeekForecast, type DayForecast } from '../lib/weather';
+import type { Project, Defect, Report, CrewEntry, MaterialEntry, Task, ProgressEntry, Contractor } from '../types';
 
-type TabId = 'diary'|'todo'|'defects'|'tasks'|'progress'|'crew'|'materials';
+type TabId = 'diary'|'todo'|'defects'|'tasks'|'progress'|'crew'|'materials'|'weather';
 function sLabel(s: string) { return s==='open'?'Otwarta':s==='in_progress'?'W toku':'Naprawiona'; }
 function sColor(s: string) { return s==='open'?C.danger:s==='in_progress'?C.warning:C.success; }
 
@@ -60,6 +62,7 @@ export default function ProjectDetailScreen({ navigation, route }: { navigation:
     {id:'progress',label:'Postęp'},
     {id:'crew',label:'Ekipa',count:crew.reduce((a,c)=>a+c.count,0)},
     {id:'materials',label:'Materiały',count:materials.length},
+    {id:'weather',label:'Pogoda'},
   ];
 
   return (
@@ -104,12 +107,13 @@ export default function ProjectDetailScreen({ navigation, route }: { navigation:
 
       <View style={{flex:1}}>
         {tab==='diary'&&<DiaryTab reports={reports} navigation={navigation} projectId={projectId} projectName={projectName} refreshing={refreshing} onRefresh={onRefresh}/>}
-        {tab==='todo'&&<DefectListTab defects={openItems} navigation={navigation} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
-        {tab==='defects'&&<DefectListTab defects={defects} navigation={navigation} showFilter onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
+        {tab==='todo'&&<DefectListTab defects={openItems} navigation={navigation} projectId={projectId} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
+        {tab==='defects'&&<DefectListTab defects={defects} navigation={navigation} projectId={projectId} showFilter onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
         {tab==='tasks'&&<TasksTab tasks={tasks} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
         {tab==='progress'&&<ProgressTab log={progressLog} refreshing={refreshing} onRefresh={onRefresh}/>}
         {tab==='crew'&&<CrewTab crew={crew} projectId={projectId} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
         {tab==='materials'&&<MaterialsTab materials={materials} projectId={projectId} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
+        {tab==='weather'&&<WeatherTab address={project?.address ?? ''} refreshing={refreshing} onRefresh={onRefresh}/>}
       </View>
     </View>
   );
@@ -148,9 +152,82 @@ function DiaryTab({ reports, navigation, projectId, projectName, refreshing, onR
 const NEXT_STATUS: Record<string,string> = { open:'in_progress', in_progress:'resolved', resolved:'open' };
 const NEXT_LABEL: Record<string,string> = { open:'Rozpocznij', in_progress:'Naprawione', resolved:'Otwórz ponownie' };
 
-function DefectListTab({ defects, navigation, showFilter, onReload, refreshing, onRefresh }: { defects: Defect[]; navigation: any; showFilter?: boolean; onReload?: ()=>void; refreshing?: boolean; onRefresh?: ()=>void }) {
+function DefectDelegateModal({ defect, projectId, onClose, onAssigned }: { defect: Defect|null; projectId: string; onClose: ()=>void; onAssigned: ()=>void }) {
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [selected, setSelected] = useState<Contractor|null>(null);
+  const [deadline, setDeadline] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!defect) return;
+    setSelected(null);
+    setDeadline(defect.deadline ?? '');
+    supabase.from('contractors').select('*').eq('project_id', projectId).order('name')
+      .then(({ data }) => {
+        if (data) {
+          setContractors(data);
+          if (defect.subcontractor) {
+            const match = data.find(c => c.name === defect.subcontractor);
+            if (match) setSelected(match);
+          }
+        }
+      });
+  }, [defect?.id]);
+
+  if (!defect) return null;
+
+  const assign = async () => {
+    if (!selected) return;
+    setSaving(true);
+    await supabase.from('defects').update({ subcontractor: selected.name, deadline: deadline || null, status: 'in_progress' }).eq('id', defect.id);
+    setSaving(false);
+    onAssigned();
+    onClose();
+  };
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[s.sheet, { maxHeight: '85%' }]}>
+          <View style={s.sheetHandle}/>
+          <Text style={s.sheetSub}>PRZYDZIEL USTERKĘ</Text>
+          <Text style={s.sheetTitle} numberOfLines={2}>{defect.description}</Text>
+          <Text style={[s.sheetSub, { marginBottom: 8 }]}>WYKONAWCA</Text>
+          <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+            {contractors.length === 0 && <Text style={{ color: C.textDim, fontSize: 13, marginBottom: 12 }}>Brak wykonawców — dodaj w zakładce Kontrahenci</Text>}
+            {contractors.map(c => {
+              const active = selected?.id === c.id;
+              return (
+                <TouchableOpacity key={c.id} onPress={() => setSelected(active ? null : c)}
+                  style={{ flexDirection:'row', alignItems:'center', gap:10, padding:10, borderRadius:12, marginBottom:6,
+                    backgroundColor: active ? C.primary+'18' : C.bg, borderWidth:1, borderColor: active ? C.primary : C.line }}>
+                  <View style={{ width:36, height:36, borderRadius:18, backgroundColor: active ? C.primary : C.surfaceHi, alignItems:'center', justifyContent:'center' }}>
+                    <Text style={{ fontSize:13, fontWeight:'700', color: active ? C.primaryInk : C.textMid }}>{c.name.slice(0,2).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex:1 }}>
+                    <Text style={{ fontSize:14, fontWeight:'700', color:C.text }}>{c.name}</Text>
+                    {c.phone && <Text style={{ fontSize:11, color:C.textMid }}>{c.phone}</Text>}
+                  </View>
+                  {active && <Ionicons name="checkmark-circle" size={20} color={C.primary}/>}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={[s.sheetSub, { marginTop:14, marginBottom:8 }]}>TERMIN (opcjonalnie)</Text>
+          <TextInput style={s.input} placeholder="np. 2026-05-10" placeholderTextColor={C.textDim} value={deadline} onChangeText={setDeadline}/>
+          <TouchableOpacity style={[s.recordBtn, !selected && { backgroundColor: C.line }]} onPress={assign} disabled={!selected || saving}>
+            {saving ? <ActivityIndicator color={C.primaryInk} size="small"/> : <Text style={{ color: selected ? C.primaryInk : C.textMid, fontWeight:'800', fontSize:15 }}>{selected ? `Przydziel → ${selected.name}` : 'Wybierz wykonawcę'}</Text>}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+function DefectListTab({ defects, navigation, showFilter, onReload, refreshing, onRefresh, projectId }: { defects: Defect[]; navigation: any; showFilter?: boolean; onReload?: ()=>void; refreshing?: boolean; onRefresh?: ()=>void; projectId?: string; }) {
   const [filter, setFilter] = useState('all');
   const [updating, setUpdating] = useState<string|null>(null);
+  const [delegateDefect, setDelegateDefect] = useState<Defect|null>(null);
   const visible = filter==='all' ? defects : defects.filter(d=>d.status===filter);
 
   const changeStatus = async (d: Defect) => {
@@ -171,6 +248,7 @@ function DefectListTab({ defects, navigation, showFilter, onReload, refreshing, 
   };
 
   return (
+    <View style={{flex:1}}>
     <FlatList
       data={visible}
       keyExtractor={d=>d.id}
@@ -210,14 +288,32 @@ function DefectListTab({ defects, navigation, showFilter, onReload, refreshing, 
             </View>
             <Text style={{fontSize:14,fontWeight:'700',color:C.text,textDecorationLine:d.status==='resolved'?'line-through':'none'}}>{d.description}</Text>
             {d.location_desc&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="location-outline" size={12} color={C.textMid}/><Text style={{fontSize:11,color:C.textMid}}>{d.location_desc}</Text></View>}
-            {d.subcontractor&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="business-outline" size={12} color={C.textMid}/><Text style={{fontSize:11,color:C.textMid}}>{d.subcontractor}</Text></View>}
-            <TouchableOpacity style={[s.statusBtn,{backgroundColor:C.danger+'22',borderColor:C.danger+'44',minWidth:0,paddingHorizontal:8,alignSelf:'flex-start'}]} onPress={()=>deleteDefect(d)}>
-              <Ionicons name="trash-outline" size={14} color={C.danger}/>
-            </TouchableOpacity>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
+              {d.subcontractor
+                ? <View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="business-outline" size={12} color={C.textMid}/><Text style={{fontSize:11,color:C.textMid}}>{d.subcontractor}</Text></View>
+                : <Text style={{fontSize:11,color:C.textDim}}>Brak wykonawcy</Text>
+              }
+              <View style={{flex:1}}/>
+              {projectId && (
+                <TouchableOpacity style={[s.delegateBtn]} onPress={()=>setDelegateDefect(d)}>
+                  <Ionicons name="send-outline" size={14} color={C.primaryInk}/>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.danger+'22'}]} onPress={()=>deleteDefect(d)}>
+                <Ionicons name="trash-outline" size={14} color={C.danger}/>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
     />
+    {projectId && <DefectDelegateModal defect={delegateDefect} projectId={projectId} onClose={()=>setDelegateDefect(null)} onAssigned={()=>{ onReload?.(); setDelegateDefect(null); }}/>}
+    {projectId && (
+      <TouchableOpacity style={s.fab} onPress={()=>navigation.navigate('DefectCamera',{projectId,reportId:null})}>
+        <Ionicons name="camera" size={26} color={C.primaryInk}/>
+      </TouchableOpacity>
+    )}
+    </View>
   );
 }
 
@@ -465,6 +561,97 @@ function MaterialsTab({ materials, projectId, onReload, refreshing, onRefresh }:
   );
 }
 
+const DAYS_PL = ['Nd','Pn','Wt','Śr','Cz','Pt','Sb'];
+function fDay(dateStr: string) {
+  const d = new Date(dateStr);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return 'Dziś';
+  const tom = new Date(); tom.setDate(tom.getDate()+1);
+  if (d.toDateString() === tom.toDateString()) return 'Jutro';
+  return DAYS_PL[d.getDay()];
+}
+
+function WeatherTab({ address, refreshing, onRefresh }: { address: string; refreshing?: boolean; onRefresh?: ()=>void }) {
+  const [forecast, setForecast] = useState<DayForecast[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [locationName, setLocationName] = useState('');
+  const [error, setError] = useState<string|null>(null);
+
+  useEffect(() => {
+    if (!address) { setError('Brak adresu projektu'); setLoading(false); return; }
+    setLoading(true); setError(null);
+    geocodeAddress(address)
+      .then(coords => {
+        if (!coords) { setError('Nie znaleziono lokalizacji dla adresu projektu'); setLoading(false); return; }
+        setLocationName(address.split(',').slice(0,2).join(','));
+        return fetchWeekForecast(coords.lat, coords.lng);
+      })
+      .then(days => { if (days) setForecast(days); setLoading(false); })
+      .catch(() => { setError('Błąd pobierania pogody'); setLoading(false); });
+  }, [address]);
+
+  if (loading) return <View style={{flex:1,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={C.primary} size="large"/><Text style={{color:C.textMid,marginTop:12,fontSize:13}}>Pobieranie prognozy…</Text></View>;
+  if (error) return <View style={{flex:1,alignItems:'center',justifyContent:'center',padding:32,gap:10}}><Ionicons name="cloud-offline-outline" size={48} color={C.textDim}/><Text style={{color:C.text,fontSize:16,fontWeight:'700',textAlign:'center'}}>{error}</Text></View>;
+
+  const today = forecast[0];
+
+  return (
+    <ScrollView contentContainerStyle={{padding:16,gap:14,paddingBottom:120}} refreshControl={<RefreshControl refreshing={refreshing??false} onRefresh={onRefresh} tintColor={C.primary}/>}>
+      {/* Lokalizacja */}
+      <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
+        <Ionicons name="location-outline" size={14} color={C.textMid}/>
+        <Text style={{fontSize:12,color:C.textMid,flex:1}} numberOfLines={1}>{locationName}</Text>
+      </View>
+
+      {/* Karta dzisiaj */}
+      {today && (
+        <View style={[s.statsCard,{alignItems:'center',gap:8}]}>
+          <Text style={{fontSize:64,lineHeight:76}}>{today.icon}</Text>
+          <Text style={{fontSize:42,fontWeight:'800',color:C.text}}>{today.maxTemp}°</Text>
+          <Text style={{fontSize:14,color:C.textMid,fontWeight:'600'}}>{today.label}</Text>
+          <View style={{flexDirection:'row',gap:20,marginTop:4}}>
+            <View style={{alignItems:'center'}}>
+              <Text style={{fontSize:11,color:C.textMid,textTransform:'uppercase',letterSpacing:0.8,fontWeight:'700'}}>MIN</Text>
+              <Text style={{fontSize:18,fontWeight:'700',color:C.info}}>{today.minTemp}°</Text>
+            </View>
+            <View style={{alignItems:'center'}}>
+              <Text style={{fontSize:11,color:C.textMid,textTransform:'uppercase',letterSpacing:0.8,fontWeight:'700'}}>MAX</Text>
+              <Text style={{fontSize:18,fontWeight:'700',color:C.danger}}>{today.maxTemp}°</Text>
+            </View>
+            <View style={{alignItems:'center'}}>
+              <Text style={{fontSize:11,color:C.textMid,textTransform:'uppercase',letterSpacing:0.8,fontWeight:'700'}}>DESZCZ</Text>
+              <Text style={{fontSize:18,fontWeight:'700',color:today.precipitation>0?C.info:C.success}}>{today.precipitation} mm</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 7 dni */}
+      <Text style={s.sectionLabel}>PROGNOZA 7 DNI</Text>
+      <View style={[s.statsCard,{gap:0}]}>
+        {forecast.map((day, i) => (
+          <View key={day.date} style={[
+            {flexDirection:'row',alignItems:'center',padding:12,gap:10},
+            i < forecast.length-1 && {borderBottomWidth:1,borderColor:C.line},
+          ]}>
+            <Text style={{width:36,fontSize:13,fontWeight:'700',color:i===0?C.primary:C.text}}>{fDay(day.date)}</Text>
+            <Text style={{fontSize:24,width:36}}>{day.icon}</Text>
+            <Text style={{flex:1,fontSize:12,color:C.textMid}} numberOfLines={1}>{day.label}</Text>
+            {day.precipitation > 0 && (
+              <View style={{flexDirection:'row',alignItems:'center',gap:3,marginRight:8}}>
+                <Ionicons name="rainy-outline" size={12} color={C.info}/>
+                <Text style={{fontSize:11,color:C.info,fontWeight:'700'}}>{day.precipitation}mm</Text>
+              </View>
+            )}
+            <Text style={{fontSize:13,color:C.info,fontWeight:'700',width:28,textAlign:'right'}}>{day.minTemp}°</Text>
+            <Text style={{fontSize:13,color:C.danger,fontWeight:'700',width:28,textAlign:'right'}}>{day.maxTemp}°</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
 function EmptyState({ icon, title, sub }: { icon: string; title: string; sub: string }) {
   return (
     <View style={{alignItems:'center',paddingTop:48,gap:10}}>
@@ -510,6 +697,7 @@ const s = StyleSheet.create({
   statusBtnText:{fontSize:11,fontWeight:'700'},
   checkBox:{width:24,height:24,borderRadius:6,borderWidth:2,borderColor:C.line,alignItems:'center',justifyContent:'center'},
   delegateBtn:{width:34,height:34,borderRadius:10,backgroundColor:C.primary,alignItems:'center',justifyContent:'center'},
+  fab:{position:'absolute',bottom:24,right:20,width:56,height:56,borderRadius:28,backgroundColor:C.primary,alignItems:'center',justifyContent:'center',shadowColor:'#000',shadowOffset:{width:0,height:4},shadowOpacity:0.3,shadowRadius:6,elevation:8},
   modalOverlay:{flex:1,backgroundColor:'rgba(0,0,0,0.6)',justifyContent:'flex-end'},
   sheet:{backgroundColor:C.surface,borderTopLeftRadius:24,borderTopRightRadius:24,padding:24,paddingBottom:40},
   sheetHandle:{width:40,height:4,backgroundColor:C.line,borderRadius:2,alignSelf:'center',marginBottom:20},

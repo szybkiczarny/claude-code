@@ -21,6 +21,7 @@ import AddProjectScreen from './src/screens/AddProjectScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import DefectCameraScreen from './src/screens/DefectCameraScreen';
 import ContractorsScreen from './src/screens/ContractorsScreen';
+import StatsScreen from './src/screens/StatsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -59,6 +60,15 @@ function ReportsStack() {
   );
 }
 
+function StatsStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
+      <Stack.Screen name="StatsDashboard" component={StatsScreen} />
+      <Stack.Screen name="StatsProfile" component={ProfileScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -80,8 +90,10 @@ function MainTabs() {
             Projects: { active: 'folder', inactive: 'folder-outline' },
             Record:   { active: 'mic-circle', inactive: 'mic-circle-outline' },
             Reports:  { active: 'document-text', inactive: 'document-text-outline' },
+            Stats:    { active: 'bar-chart', inactive: 'bar-chart-outline' },
           };
           const icon = icons[route.name];
+          if (!icon) return null;
           return <Ionicons name={(focused ? icon.active : icon.inactive) as any} size={route.name === 'Record' ? 32 : 24} color={color} />;
         },
       })}
@@ -89,6 +101,7 @@ function MainTabs() {
       <Tab.Screen name="Projects" component={ProjectsStack} options={{ tabBarLabel: 'Projekty' }} />
       <Tab.Screen name="Record" component={RecordStack} options={{ tabBarLabel: 'Nagraj' }} />
       <Tab.Screen name="Reports" component={ReportsStack} options={{ tabBarLabel: 'Raporty' }} />
+      <Tab.Screen name="Stats" component={StatsStack} options={{ tabBarLabel: 'Statystyki' }} />
     </Tab.Navigator>
   );
 }

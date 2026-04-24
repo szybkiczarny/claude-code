@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Icons } from '../components/Icons';
-import { Card, Progress, StatusLabelChip, PriorityBar, MiniStat, SectionLabel, ScreenHeader, TradeIcon, PhotoThumb } from '../components/UI';
+import { Card, Progress, PriorityBar, MiniStat, SectionLabel, ScreenHeader, TradeIcon, PhotoThumb } from '../components/UI';
 import { DelegateSheet } from '../components/DelegateSheet';
 import type { Project, Defect, Report, CrewEntry, MaterialEntry } from '../types';
 
@@ -23,9 +23,6 @@ function projectCode(name: string) {
   return parts.slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') + '-' + new Date().getFullYear();
 }
 
-function statusLabel(s: string) {
-  return s === 'open' ? 'Otwarta' : s === 'in_progress' ? 'W toku' : 'Naprawiona';
-}
 
 interface Props {
   projectId: string;
@@ -159,16 +156,16 @@ export default function ProjectDetailPage({ projectId, onBack, onOpenReport, onR
           <DiaryTab reports={reports} onOpenReport={onOpenReport} onRecord={onRecord} />
         )}
         {tab === 'todo' && (
-          <TodoTab defects={defects.filter(d => d.status === 'open' || d.status === 'in_progress')} onDelegate={setDelegateFor} />
+          <TodoTab defects={defects.filter(d => d.status === 'open' || d.status === 'in_progress')} onDelegate={setDelegateFor} onReload={reload} />
         )}
         {tab === 'defects' && (
-          <DefectsTab defects={defects} onDelegate={setDelegateFor} />
+          <DefectsTab defects={defects} onDelegate={setDelegateFor} onReload={reload} />
         )}
         {tab === 'crew' && <CrewTab projectId={projectId} crew={crew} onReload={reload} />}
         {tab === 'materials' && <MaterialsTab projectId={projectId} materials={materials} onReload={reload} />}
       </div>
 
-      <DelegateSheet open={!!delegateFor} onClose={() => setDelegateFor(null)} defect={delegateFor} />
+      <DelegateSheet open={!!delegateFor} onClose={() => setDelegateFor(null)} defect={delegateFor} onAssigned={reload} />
     </div>
   );
 }
@@ -223,19 +220,19 @@ function DiaryTab({ reports, onOpenReport, onRecord }: { reports: Report[]; onOp
   );
 }
 
-function TodoTab({ defects, onDelegate }: { defects: Defect[]; onDelegate: (d: Defect) => void }) {
+function TodoTab({ defects, onDelegate, onReload }: { defects: Defect[]; onDelegate: (d: Defect) => void; onReload: () => void }) {
   if (defects.length === 0) return (
     <EmptyState icon={<Icons.Check size={40} strokeWidth={1.5} />} title="Nic do zrobienia" sub="Usterki z raportów głosowych pojawią się tutaj" />
   );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {defects.map(d => <DefectCard key={d.id} defect={d} onDelegate={onDelegate} />)}
+      {defects.map(d => <DefectCard key={d.id} defect={d} onDelegate={onDelegate} onStatusChange={onReload} />)}
     </div>
   );
 }
 
-function DefectsTab({ defects, onDelegate }: { defects: Defect[]; onDelegate: (d: Defect) => void }) {
+function DefectsTab({ defects, onDelegate, onReload }: { defects: Defect[]; onDelegate: (d: Defect) => void; onReload: () => void }) {
   const [filter, setFilter] = useState('all');
   const filters = [
     { id: 'all',         label: 'Wszystkie',  count: defects.length },
@@ -269,13 +266,48 @@ function DefectsTab({ defects, onDelegate }: { defects: Defect[]; onDelegate: (d
         ))}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {visible.map(d => <DefectCard key={d.id} defect={d} onDelegate={onDelegate} />)}
+        {visible.map(d => <DefectCard key={d.id} defect={d} onDelegate={onDelegate} onStatusChange={onReload} />)}
       </div>
     </>
   );
 }
 
-function DefectCard({ defect: d, onDelegate }: { defect: Defect; onDelegate: (d: Defect) => void }) {
+const STATUS_CYCLE: Record<string, Defect['status']> = {
+  open: 'in_progress',
+  in_progress: 'resolved',
+  resolved: 'open',
+};
+
+function StatusToggle({ defect, onChanged }: { defect: Defect; onChanged: (updated: Defect) => void }) {
+  const [busy, setBusy] = useState(false);
+  const cycle = async () => {
+    if (busy) return;
+    const next = STATUS_CYCLE[defect.status];
+    setBusy(true);
+    await supabase.from('defects').update({ status: next }).eq('id', defect.id);
+    setBusy(false);
+    onChanged({ ...defect, status: next });
+  };
+  const label = defect.status === 'open' ? 'Otwarta' : defect.status === 'in_progress' ? 'W toku' : 'Naprawiona';
+  const color = defect.status === 'open' ? T.danger : defect.status === 'in_progress' ? T.warning : T.success;
+  return (
+    <button onClick={cycle} disabled={busy} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+      background: `color-mix(in oklab, ${color} 18%, transparent)`,
+      color, border: `1px solid color-mix(in oklab, ${color} 40%, transparent)`,
+      cursor: 'pointer', fontFamily: 'inherit',
+      WebkitTapHighlightColor: 'transparent',
+    }}>
+      {busy ? '…' : label}
+    </button>
+  );
+}
+
+function DefectCard({ defect: initialD, onDelegate, onStatusChange }: { defect: Defect; onDelegate: (d: Defect) => void; onStatusChange: (updated: Defect) => void }) {
+  const [d, setD] = useState(initialD);
+  useEffect(() => { setD(initialD); }, [initialD]);
+  const handleStatusChange = (updated: Defect) => { setD(updated); onStatusChange(updated); };
   return (
     <Card padded={false} style={{ opacity: d.status === 'resolved' ? 0.65 : 1 }}>
       <div style={{ padding: 14, display: 'flex', gap: 12 }}>
@@ -284,7 +316,7 @@ function DefectCard({ defect: d, onDelegate }: { defect: Defect; onDelegate: (d:
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <PriorityBar level={d.severity} />
             <div style={{ flex: 1 }} />
-            <StatusLabelChip status={d.status} label={statusLabel(d.status)} />
+            <StatusToggle defect={d} onChanged={handleStatusChange} />
           </div>
           <div style={{ fontSize: 14, fontWeight: 700, color: T.text, lineHeight: 1.3, textDecoration: d.status === 'resolved' ? 'line-through' : 'none' }}>
             {d.description}
@@ -296,37 +328,37 @@ function DefectCard({ defect: d, onDelegate }: { defect: Defect; onDelegate: (d:
           )}
         </div>
       </div>
-      {(d.subcontractor || d.deadline) && (
-        <div style={{
-          padding: '10px 14px', borderTop: `1px solid ${T.line}`,
-          display: 'flex', alignItems: 'center', gap: 10,
-          background: `color-mix(in oklab, ${T.bg} 30%, transparent)`,
-        }}>
-          <TradeIcon trade="concrete" size={14} />
-          {d.subcontractor && (
-            <span style={{ fontSize: 11, color: T.textMid, fontWeight: 600 }}>{d.subcontractor}</span>
-          )}
-          <div style={{ flex: 1 }} />
-          {d.deadline && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-              background: T.surfaceHi, color: T.textMid, border: `1px solid ${T.line}`,
-            }}>
-              <Icons.Calendar size={11} /> {d.deadline}
-            </span>
-          )}
-          <button
-            onClick={() => onDelegate(d)}
-            style={{
-              width: 32, height: 32, borderRadius: 8, background: T.primary, color: T.primaryInk,
-              border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Icons.Send size={15} />
-          </button>
-        </div>
-      )}
+      <div style={{
+        padding: '10px 14px', borderTop: `1px solid ${T.line}`,
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: `color-mix(in oklab, ${T.bg} 30%, transparent)`,
+      }}>
+        <TradeIcon trade="concrete" size={14} />
+        {d.subcontractor ? (
+          <span style={{ fontSize: 11, color: T.textMid, fontWeight: 600 }}>{d.subcontractor}</span>
+        ) : (
+          <span style={{ fontSize: 11, color: T.textDim, fontWeight: 600 }}>Brak wykonawcy</span>
+        )}
+        <div style={{ flex: 1 }} />
+        {d.deadline && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+            background: T.surfaceHi, color: T.textMid, border: `1px solid ${T.line}`,
+          }}>
+            <Icons.Calendar size={11} /> {d.deadline}
+          </span>
+        )}
+        <button
+          onClick={() => onDelegate(d)}
+          style={{
+            width: 32, height: 32, borderRadius: 8, background: T.primary, color: T.primaryInk,
+            border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Icons.Send size={15} />
+        </button>
+      </div>
     </Card>
   );
 }

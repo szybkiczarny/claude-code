@@ -10,6 +10,7 @@ import type { User } from '@supabase/supabase-js';
 
 import { supabase } from './src/lib/supabase';
 import { C } from './src/theme';
+import { registerForPushNotifications, scheduleDailyDigest, setupNotificationHandlers } from './src/lib/notifications';
 
 import AuthScreen from './src/screens/AuthScreen';
 import ProjectsScreen from './src/screens/ProjectsScreen';
@@ -117,8 +118,13 @@ export default function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        registerForPushNotifications();
+        scheduleDailyDigest();
+      }
     });
-    return () => subscription.unsubscribe();
+    const cleanupHandlers = setupNotificationHandlers();
+    return () => { subscription.unsubscribe(); cleanupHandlers(); };
   }, []);
 
   if (loading) return (

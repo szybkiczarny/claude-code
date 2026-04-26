@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { C } from '../theme';
+import { scheduleDeadlineReminder } from '../lib/notifications';
 import { useEffect } from 'react';
 import { geocodeAddress, fetchWeekForecast, type DayForecast } from '../lib/weather';
 import type { Project, Defect, Report, CrewEntry, MaterialEntry, Task, ProgressEntry, Contractor } from '../types';
@@ -180,6 +181,9 @@ function DefectDelegateModal({ defect, projectId, onClose, onAssigned }: { defec
     if (!selected) return;
     setSaving(true);
     await supabase.from('defects').update({ subcontractor: selected.name, deadline: deadline || null, status: 'in_progress' }).eq('id', defect.id);
+    if (deadline) {
+      scheduleDeadlineReminder(defect.description, selected.name, deadline);
+    }
     setSaving(false);
     onAssigned();
     onClose();

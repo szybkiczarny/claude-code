@@ -49,15 +49,24 @@ export default function DefectCameraScreen({ navigation, route }: { navigation: 
     setStep('uploading');
     try {
       const photoUrl = await uploadToR2(photoUri, `${Date.now()}.jpg`);
+      const desc = description.trim() || 'Usterka sfotografowana na budowie';
       await supabase.from('defects').insert({
         project_id: projectId,
         report_id: reportId ?? null,
         photo_url: photoUrl,
         severity,
         location_desc: location.trim() || null,
-        description: description.trim() || 'Usterka sfotografowana na budowie',
+        description: desc,
         status: 'open',
       });
+      supabase.functions.invoke('send-push', {
+        body: {
+          project_id: projectId,
+          title: 'Nowa usterka',
+          body: desc,
+          data: { project_id: projectId },
+        },
+      }).catch(() => {});
       setStep('done');
     } catch (err: any) {
       Alert.alert('Błąd', err?.message ?? 'Nie udało się zapisać');

@@ -25,7 +25,16 @@
           "microphonePermission": "Aplikacja potrzebuje mikrofonu do nagrywania raportów."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1D6FB8",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": false,

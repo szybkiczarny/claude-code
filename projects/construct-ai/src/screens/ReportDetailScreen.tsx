@@ -276,8 +276,17 @@ export default function ReportDetailScreen({ navigation, route }: { navigation: 
                   <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.surfaceHi,marginRight:6}]} onPress={()=>navigation.navigate('DefectCamera',{projectId:report.project_id,reportId:report.id})}>
                     <Ionicons name="camera-outline" size={14} color={C.textMid}/>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.surfaceHi,marginRight:6}]} onPress={()=>setDelegateDefect(d)}>
-                    <Ionicons name="send-outline" size={14} color={C.primary}/>
+                  <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.surfaceHi,marginRight:6}]} onPress={()=>{
+                    const msg = [
+                      `🔧 Usterka: ${d.description}`,
+                      d.location_desc ? `📍 Lokalizacja: ${d.location_desc}` : null,
+                      d.action ? `🛠️ Działanie: ${d.action}` : null,
+                      d.severity ? `⚠️ Powaga: ${severityLabel(d.severity)}` : null,
+                      d.deadline ? `📅 Termin: ${d.deadline}` : null,
+                    ].filter(Boolean).join('\n');
+                    Share.share({ message: msg });
+                  }}>
+                    <Ionicons name="share-social-outline" size={14} color={C.primary}/>
                   </TouchableOpacity>
                   <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.danger+'22'}]} onPress={()=>deleteDefect(d)}>
                     <Ionicons name="trash-outline" size={14} color={C.danger}/>

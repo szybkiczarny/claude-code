@@ -3,6 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { supabase } from '../lib/supabase';
 import { C } from '../theme';
 import { scheduleDeadlineReminder } from '../lib/notifications';
@@ -10,7 +12,7 @@ import { useEffect } from 'react';
 import { geocodeAddress, fetchWeekForecast, type DayForecast } from '../lib/weather';
 import type { Project, Defect, Report, CrewEntry, MaterialEntry, Task, ProgressEntry, Contractor } from '../types';
 
-type TabId = 'diary'|'todo'|'defects'|'tasks'|'progress'|'crew'|'materials'|'weather';
+type TabId = 'diary'|'todo'|'tasks'|'progress'|'crew'|'materials'|'weather'|'docs';
 function sLabel(s: string) { return s==='open'?'Otwarta':s==='in_progress'?'W toku':'Naprawiona'; }
 function sColor(s: string) { return s==='open'?C.danger:s==='in_progress'?C.warning:C.success; }
 
@@ -58,8 +60,8 @@ export default function ProjectDetailScreen({ navigation, route }: { navigation:
   const TABS: {id:TabId;label:string;count?:number}[] = [
     {id:'diary',label:'Dziennik'},
     {id:'todo',label:'Do zrobienia',count:openItems.length},
-    {id:'defects',label:'Usterki',count:defects.length},
     {id:'tasks',label:'Zadania',count:openTasks.length||undefined},
+    {id:'docs',label:'Dokumenty'},
     {id:'progress',label:'Postęp'},
     {id:'crew',label:'Ekipa',count:crew.reduce((a,c)=>a+c.count,0)},
     {id:'materials',label:'Materiały',count:materials.length},
@@ -109,7 +111,7 @@ export default function ProjectDetailScreen({ navigation, route }: { navigation:
       <View style={{flex:1}}>
         {tab==='diary'&&<DiaryTab reports={reports} navigation={navigation} projectId={projectId} projectName={projectName} refreshing={refreshing} onRefresh={onRefresh}/>}
         {tab==='todo'&&<DefectListTab defects={openItems} navigation={navigation} projectId={projectId} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
-        {tab==='defects'&&<DefectListTab defects={defects} navigation={navigation} projectId={projectId} showFilter onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
+        {tab==='docs'&&<DocumentsTab projectId={projectId}/>}
         {tab==='tasks'&&<TasksTab tasks={tasks} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
         {tab==='progress'&&<ProgressTab log={progressLog} refreshing={refreshing} onRefresh={onRefresh}/>}
         {tab==='crew'&&<CrewTab crew={crew} projectId={projectId} onReload={load} refreshing={refreshing} onRefresh={onRefresh}/>}
@@ -299,8 +301,16 @@ function DefectListTab({ defects, navigation, showFilter, onReload, refreshing, 
               }
               <View style={{flex:1}}/>
               {projectId && (
-                <TouchableOpacity style={[s.delegateBtn]} onPress={()=>setDelegateDefect(d)}>
-                  <Ionicons name="send-outline" size={14} color={C.primaryInk}/>
+                <TouchableOpacity style={[s.delegateBtn]} onPress={()=>{
+                  const msg = [
+                    `🔧 Usterka: ${d.description}`,
+                    d.location_desc ? `📍 Lokalizacja: ${d.location_desc}` : null,
+                    d.action ? `🛠️ Działanie: ${d.action}` : null,
+                    d.deadline ? `📅 Termin: ${d.deadline}` : null,
+                  ].filter(Boolean).join('\n');
+                  Share.share({ message: msg });
+                }}>
+                  <Ionicons name="share-social-outline" size={14} color={C.primaryInk}/>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={[s.delegateBtn,{backgroundColor:C.danger+'22'}]} onPress={()=>deleteDefect(d)}>
@@ -664,6 +674,145 @@ function EmptyState({ icon, title, sub }: { icon: string; title: string; sub: st
       <Text style={{fontSize:13,color:C.textDim,textAlign:'center'}}>{sub}</Text>
     </View>
   );
+}
+
+type DocRow = { id: string; name: string; revision: string; file_url: string; file_type: string|null; created_at: string };
+
+function DocumentsTab({ projectId }: { projectId: string }) {
+  const [docs, setDocs] = useState<DocRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [revModal, setRevModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<any>(null);
+  const [revision, setRevision] = useState('R0');
+
+  const load = async () => {
+    const { data } = await supabase.from('documents').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
+    setDocs(data ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const pickAndUpload = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+    if (result.canceled) return;
+    const file = result.assets[0];
+    setPendingFile(file);
+    setRevision('R0');
+    setRevModal(true);
+  };
+
+  const upload = async () => {
+    if (!pendingFile) return;
+    setRevModal(false);
+    setUploading(true);
+    try {
+      const base64 = await FileSystem.readAsStringAsync(pendingFile.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const ext = pendingFile.name.split('.').pop() ?? 'bin';
+      const path = `${projectId}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, decode(base64), { contentType: pendingFile.mimeType ?? 'application/octet-stream' });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path);
+      await supabase.from('documents').insert({ project_id: projectId, name: pendingFile.name, revision, file_url: publicUrl, file_type: pendingFile.mimeType });
+      await load();
+    } catch (e: any) {
+      Alert.alert('Błąd', e.message ?? 'Nie udało się wgrać pliku');
+    }
+    setUploading(false);
+    setPendingFile(null);
+  };
+
+  const deleteDoc = (doc: DocRow) => {
+    Alert.alert('Usuń dokument', `Usunąć "${doc.name}"?`, [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: async () => {
+        await supabase.from('documents').delete().eq('id', doc.id);
+        setDocs(d => d.filter(x => x.id !== doc.id));
+      }},
+    ]);
+  };
+
+  const fileIcon = (type: string|null) => {
+    if (!type) return 'document-outline';
+    if (type.includes('pdf')) return 'document-text-outline';
+    if (type.includes('image')) return 'image-outline';
+    if (type.includes('sheet') || type.includes('excel')) return 'grid-outline';
+    return 'document-outline';
+  };
+
+  if (loading) return <ActivityIndicator color={C.primary} style={{ marginTop: 40 }}/>;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        {docs.length === 0 && (
+          <View style={{ alignItems: 'center', paddingTop: 48, gap: 10 }}>
+            <Ionicons name="folder-open-outline" size={48} color={C.textDim}/>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>Brak dokumentów</Text>
+            <Text style={{ fontSize: 13, color: C.textDim, textAlign: 'center' }}>Wgraj rysunki, plany lub inne pliki projektowe</Text>
+          </View>
+        )}
+        {docs.map(doc => (
+          <View key={doc.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: 12, padding: 12, marginBottom: 8, gap: 12, borderWidth: 1, borderColor: C.line }}>
+            <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: C.primary + '20', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={fileIcon(doc.file_type) as any} size={22} color={C.primary}/>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }} numberOfLines={1}>{doc.name}</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 2 }}>
+                <View style={{ backgroundColor: C.primary + '22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: C.primary }}>{doc.revision}</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: C.textDim }}>{new Date(doc.created_at).toLocaleDateString('pl-PL')}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => Linking.openURL(doc.file_url)} style={{ padding: 6 }}>
+              <Ionicons name="open-outline" size={20} color={C.primary}/>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => deleteDoc(doc)} style={{ padding: 6 }}>
+              <Ionicons name="trash-outline" size={18} color={C.danger}/>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </ScrollView>
+
+      <TouchableOpacity
+        style={{ position: 'absolute', bottom: 24, right: 20, backgroundColor: C.primary, borderRadius: 28, width: 56, height: 56, alignItems: 'center', justifyContent: 'center', elevation: 4 }}
+        onPress={pickAndUpload}
+        disabled={uploading}
+      >
+        {uploading ? <ActivityIndicator color={C.primaryInk}/> : <Ionicons name="cloud-upload-outline" size={26} color={C.primaryInk}/>}
+      </TouchableOpacity>
+
+      <Modal visible={revModal} transparent animationType="slide" onRequestClose={() => setRevModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000066' }}>
+          <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>Numer rewizji</Text>
+            <Text style={{ fontSize: 13, color: C.textDim }}>{pendingFile?.name}</Text>
+            <TextInput
+              style={{ backgroundColor: C.bg, borderRadius: 10, padding: 12, color: C.text, fontSize: 16, borderWidth: 1, borderColor: C.line }}
+              value={revision}
+              onChangeText={setRevision}
+              placeholder="np. R0, R1, Rev.2"
+              placeholderTextColor={C.textDim}
+              autoFocus
+            />
+            <TouchableOpacity style={{ backgroundColor: C.primary, borderRadius: 12, padding: 14, alignItems: 'center' }} onPress={upload}>
+              <Text style={{ color: C.primaryInk, fontWeight: '700', fontSize: 15 }}>Wgraj dokument</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function decode(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 const s = StyleSheet.create({

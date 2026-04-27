@@ -89,18 +89,16 @@ function MainTabs() {
         tabBarIcon: ({ color, focused }) => {
           const icons: Record<string, { active: string; inactive: string }> = {
             Projects: { active: 'folder', inactive: 'folder-outline' },
-            Record:   { active: 'mic-circle', inactive: 'mic-circle-outline' },
             Reports:  { active: 'document-text', inactive: 'document-text-outline' },
             Stats:    { active: 'bar-chart', inactive: 'bar-chart-outline' },
           };
           const icon = icons[route.name];
           if (!icon) return null;
-          return <Ionicons name={(focused ? icon.active : icon.inactive) as any} size={route.name === 'Record' ? 32 : 24} color={color} />;
+          return <Ionicons name={(focused ? icon.active : icon.inactive) as any} size={24} color={color} />;
         },
       })}
     >
       <Tab.Screen name="Projects" component={ProjectsStack} options={{ tabBarLabel: 'Projekty' }} />
-      <Tab.Screen name="Record" component={RecordStack} options={{ tabBarLabel: 'Nagraj' }} />
       <Tab.Screen name="Reports" component={ReportsStack} options={{ tabBarLabel: 'Raporty' }} />
       <Tab.Screen name="Stats" component={StatsStack} options={{ tabBarLabel: 'Statystyki' }} />
     </Tab.Navigator>

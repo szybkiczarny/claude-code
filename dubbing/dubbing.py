@@ -1,33 +1,35 @@
 #!/usr/bin/env python3
 """
 Automatyczny dubbing filmików YouTube na język polski + publikacja na YT.
+
+Użycie:
+  Krok 1 — transkrypcja:
+    python3 dubbing.py <url>
+    → pobiera wideo, transkrybuje, tłumaczy, zapisuje tekst PL
+
+  Krok 2 — montaż i upload (po nagraniu głosu w ElevenLabs):
+    python3 dubbing.py <url> --audio <sciezka_do_pliku_el.mp3>
 """
 
-import os
+import sys
 import subprocess
 import tempfile
 import json
+import argparse
 from pathlib import Path
 
 # ============================================================
-# KONFIGURACJA — uzupełnij przed uruchomieniem
+# KONFIGURACJA
 # ============================================================
 
-ELEVENLABS_API_KEY  = "sk_2714880a517b7b27a694e595087cf172c5ce5da89e084495"
-ELEVENLABS_VOICE_ID = "LaU8vObBJb1GS2SoBOWT"
-
 DEEPL_API_KEY = "90134da7-52be-465c-a15d-691b4dfa2571:fx"
+GROQ_API_KEY  = "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"
 
 YOUTUBE_CLIENT_SECRETS = "/home/kuba/yt-automation/client_secret.json"
 YOUTUBE_TOKEN_FILE     = Path(__file__).parent / "yt_token.json"
 
-YOUTUBE_URL = "https://youtube.com/shorts/rXM6_AiisB4?si=3hKOy2_NnCBMCaB_"
-
 # Głośność muzyki w tle (0.0 = cisza, 1.0 = pełna)
 VOLUME_MUZYKA = 0.8
-
-# Model Whisper: tiny / base / small / medium / large
-WHISPER_MODEL = "base"
 
 # ============================================================
 
@@ -109,22 +111,32 @@ def wyciagnij_audio(sciezka_wideo: Path, katalog: Path) -> Path:
 
 
 # ------------------------------------------------------------------
-# 3. Transkrybuj audio do tekstu (Whisper)
+# 3. Transkrybuj audio do tekstu (Groq Whisper large-v3)
 # ------------------------------------------------------------------
 def transkrybuj(sciezka_audio: Path) -> list[dict]:
-    krok(3, "Transkrypcja audio → tekst (Whisper)")
+    krok(3, "Transkrypcja audio → tekst (Groq whisper-large-v3)")
 
-    import whisper
-    print(f"  Ładuję model Whisper '{WHISPER_MODEL}'...")
-    model = whisper.load_model(WHISPER_MODEL)
+    from groq import Groq
 
-    print("  Transkrybuję...")
-    wynik = model.transcribe(str(sciezka_audio), verbose=False)
+    klient = Groq(api_key=GROQ_API_KEY)
+    print("  Wysyłam audio do Groq Whisper large-v3...")
 
-    segmenty = wynik.get("segments", [])
+    with open(sciezka_audio, "rb") as f:
+        transkrypcja = klient.audio.transcriptions.create(
+            file=(sciezka_audio.name, f),
+            model="whisper-large-v3",
+            response_format="verbose_json",
+            timestamp_granularities=["segment"],
+        )
+
+    segmenty = [
+        {"start": s["start"], "end": s["end"], "text": s["text"].strip()}
+        for s in transkrypcja.segments
+    ]
+    print(f"  Wykryty język: {transkrypcja.language}")
     print(f"  Znaleziono {len(segmenty)} segmentów.")
     for s in segmenty[:3]:
-        print(f"    [{s['start']:.1f}s – {s['end']:.1f}s] {s['text'].strip()}")
+        print(f"    [{s['start']:.1f}s – {s['end']:.1f}s] {s['text']}")
     if len(segmenty) > 3:
         print(f"    ... i {len(segmenty) - 3} więcej")
 
@@ -156,42 +168,57 @@ def przetlumacz(segmenty: list[dict]) -> tuple[list[dict], str]:
 
 
 # ------------------------------------------------------------------
-# 5. Wygeneruj polski głos (ElevenLabs)
+# 4b. Opisz wideo przez GPT-4o Vision (gdy brak mowy)
 # ------------------------------------------------------------------
-def generuj_glos(segmenty_pl: list[dict], katalog: Path) -> Path:
-    krok(5, "Generowanie polskiego głosu (ElevenLabs)")
+def opisz_wideo_groq(sciezka_wideo: Path) -> str:
+    krok(4, "Opis wizualny wideo (Groq llama-3.2-vision)")
 
-    from elevenlabs.client import ElevenLabs
-    from elevenlabs import VoiceSettings
+    import base64
+    from groq import Groq
 
-    klient = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+    dlugosc = get_duration(sciezka_wideo)
+    # Groq vision przyjmuje 1 obrazek na raz — wysyłamy reprezentatywną klatkę ze środka
+    srodek = dlugosc / 2
+    print(f"  Długość wideo: {dlugosc:.1f}s — wyciągam 6 klatek co ~{dlugosc/6:.0f}s")
 
-    pelny_tekst = " ".join(s["text"] for s in segmenty_pl if s["text"].strip())
-    print(f"  Tekst do syntezy ({len(pelny_tekst)} znaków): {pelny_tekst[:80]}...")
+    with tempfile.TemporaryDirectory(prefix="klatki_") as tmp_klatki:
+        run([
+            "ffmpeg", "-y",
+            "-i", str(sciezka_wideo),
+            "-vf", f"fps=6/{dlugosc:.2f},scale=768:-1",
+            "-q:v", "2",
+            f"{tmp_klatki}/klatka_%03d.jpg",
+        ], capture_output=True)
 
-    sciezka_tts = katalog / "tts_polski.mp3"
-    print("  Generuję mowę...")
+        klatki = sorted(Path(tmp_klatki).glob("klatka_*.jpg"))[:6]
+        print(f"  Wyciągnięto {len(klatki)} klatek")
 
-    audio = klient.text_to_speech.convert(
-        voice_id=ELEVENLABS_VOICE_ID,
-        output_format="mp3_44100_128",
-        text=pelny_tekst,
-        model_id="eleven_multilingual_v2",
-        voice_settings=VoiceSettings(
-            stability=0.5,
-            similarity_boost=0.8,
-            style=0.0,
-            use_speaker_boost=True,
-        ),
-    )
+        opisy = []
+        klient = Groq(api_key=GROQ_API_KEY)
 
-    with open(sciezka_tts, "wb") as f:
-        for chunk in audio:
-            if chunk:
-                f.write(chunk)
+        for i, klatka in enumerate(klatki):
+            dane = base64.b64encode(klatka.read_bytes()).decode()
+            czas = round(i * dlugosc / len(klatki))
+            print(f"  Opisuję klatkę {i+1}/{len(klatki)} (t={czas}s)...")
 
-    print(f"  Głos zapisany: {sciezka_tts}")
-    return sciezka_tts
+            odp = klient.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=[{"role": "user", "content": [
+                    {"type": "text", "text": (
+                        f"Opisz krótko (1-2 zdania) po polsku co widzisz na tym kadrze z filmiku (czas: {czas}s). "
+                        "Skup się na postaciach, akcji i otoczeniu. Nie wspominaj że to kadr."
+                    )},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{dane}"}},
+                ]}],
+                max_tokens=200,
+            )
+            opisy.append(odp.choices[0].message.content.strip())
+
+    pelny_opis = " ".join(opisy)
+    print(f"  Opis ({len(pelny_opis)} znaków): {pelny_opis[:120]}...")
+    return pelny_opis
+
+
 
 
 # ------------------------------------------------------------------
@@ -367,28 +394,59 @@ def opublikuj_na_youtube(sciezka_wideo: Path, tytul_pl: str, opis_pl: str) -> st
 # MAIN
 # ------------------------------------------------------------------
 def main() -> None:
-    print("\n🎬 Automatyczny dubbing YouTube → Polski + publikacja")
-    print(f"   URL: {YOUTUBE_URL}\n")
+    parser = argparse.ArgumentParser(description="Dubbing YouTube → Polski")
+    parser.add_argument("url", help="Link do filmiku YouTube")
+    parser.add_argument("--audio", metavar="PLIK", help="Ścieżka do pliku audio z ElevenLabs (krok 2)")
+    args = parser.parse_args()
 
-    with tempfile.TemporaryDirectory(prefix="dubbing_") as tmp:
-        tmp_dir = Path(tmp)
+    if args.audio:
+        # ── KROK 2: montaż + upload ──────────────────────────────
+        sciezka_audio_el = Path(args.audio)
+        if not sciezka_audio_el.exists():
+            print(f"Błąd: nie znaleziono pliku audio: {sciezka_audio_el}")
+            sys.exit(1)
 
-        sciezka_wideo, video_id, info    = pobierz_filmik(YOUTUBE_URL, tmp_dir)
-        sciezka_audio                    = wyciagnij_audio(sciezka_wideo, tmp_dir)
-        segmenty                         = transkrybuj(sciezka_audio)
-        segmenty_pl, pelny_tekst_pl      = przetlumacz(segmenty)
-        sciezka_tts                      = generuj_glos(segmenty_pl, tmp_dir)
-        sciezka_dopasowana, dl_wideo     = dopasuj_tempo(sciezka_tts, sciezka_wideo, tmp_dir)
-        sciezka_muzyki                   = wyodrebnij_muzyke(sciezka_wideo, tmp_dir)
-        wynik                            = montuj_wideo(sciezka_wideo, sciezka_dopasowana, sciezka_muzyki, dl_wideo, video_id)
+        print("\n🎬 Krok 2: montaż + publikacja na YouTube")
+        print(f"   URL:   {args.url}")
+        print(f"   Audio: {sciezka_audio_el}\n")
 
-        tytul_oryginalny = info.get("title", video_id)
-        tytul_pl = f"[PL] {tytul_oryginalny}"
-        opis_pl  = f"Polski dubbing | Oryginał: {YOUTUBE_URL}\n\n{pelny_tekst_pl}"
+        with tempfile.TemporaryDirectory(prefix="dubbing_") as tmp:
+            tmp_dir = Path(tmp)
+            sciezka_wideo, video_id, info = pobierz_filmik(args.url, tmp_dir)
+            sciezka_dopasowana, dl_wideo  = dopasuj_tempo(sciezka_audio_el, sciezka_wideo, tmp_dir)
+            sciezka_muzyki                = wyodrebnij_muzyke(sciezka_wideo, tmp_dir)
+            wynik                         = montuj_wideo(sciezka_wideo, sciezka_dopasowana, sciezka_muzyki, dl_wideo, video_id)
 
-        url_yt = opublikuj_na_youtube(wynik, tytul_pl, opis_pl)
+            tytul_pl = f"[PL] {info.get('title', video_id)}"[:100]
+            opis_pl  = f"Polski dubbing | Oryginał: {args.url}"
 
-    print(f"\n✅ Gotowe! Film opublikowany: {url_yt}\n")
+            url_yt = opublikuj_na_youtube(wynik, tytul_pl, opis_pl)
+
+        print(f"\n✅ Gotowe! Film opublikowany: {url_yt}\n")
+
+    else:
+        # ── KROK 1: transkrypcja + tłumaczenie ──────────────────
+        print("\n📝 Krok 1: transkrypcja + tłumaczenie")
+        print(f"   URL: {args.url}\n")
+
+        with tempfile.TemporaryDirectory(prefix="dubbing_") as tmp:
+            tmp_dir = Path(tmp)
+            sciezka_wideo, video_id, info = pobierz_filmik(args.url, tmp_dir)
+            sciezka_audio                 = wyciagnij_audio(sciezka_wideo, tmp_dir)
+            segmenty                      = transkrybuj(sciezka_audio)
+            segmenty_pl, pelny_tekst_pl   = przetlumacz(segmenty)
+
+        plik_tekstu = OUTPUT_DIR / f"{video_id}_tekst_pl.txt"
+        plik_tekstu.write_text(pelny_tekst_pl, encoding="utf-8")
+
+        print(f"\n{'='*60}")
+        print("  TEKST PL (wklej do ElevenLabs):")
+        print(f"{'='*60}")
+        print(pelny_tekst_pl)
+        print(f"{'='*60}")
+        print(f"\n  Zapisano też do: {plik_tekstu}")
+        print(f"\n  Gdy masz plik audio, uruchom:")
+        print(f"  python3 dubbing.py '{args.url}' --audio <sciezka_do_pliku>\n")
 
 
 if __name__ == "__main__":

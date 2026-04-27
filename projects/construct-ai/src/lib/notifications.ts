@@ -4,18 +4,22 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+const isExpoGo = Constants.appOwnership === 'expo';
+
+if (!isExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) return null;
+  if (isExpoGo || !Device.isDevice) return null;
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -53,6 +57,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 export async function scheduleDailyDigest() {
+  if (isExpoGo) return;
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of scheduled) {
     if (n.content.data?.type === 'daily_digest') {
@@ -71,6 +76,7 @@ export async function scheduleDailyDigest() {
 }
 
 export async function scheduleDeadlineReminder(description: string, contractor: string, deadline: string) {
+  if (isExpoGo) return;
   const deadlineDate = new Date(deadline);
   const now = new Date();
 
@@ -105,8 +111,7 @@ export async function scheduleDeadlineReminder(description: string, contractor: 
 }
 
 export function setupNotificationHandlers() {
-  const sub = Notifications.addNotificationResponseReceivedListener(_response => {
-    // nawigacja do usterek po tapnięciu - obsługiwane wyżej przez navigationRef
-  });
+  if (isExpoGo) return () => {};
+  const sub = Notifications.addNotificationResponseReceivedListener(_response => {});
   return () => sub.remove();
 }

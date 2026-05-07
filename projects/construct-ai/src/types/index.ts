@@ -37,6 +37,31 @@ export interface Defect {
   deadline: string | null;
   action: string | null;
   status: 'open' | 'in_progress' | 'resolved';
+  floor_plan_id: string | null;
+  pin_x: number | null;
+  pin_y: number | null;
+  created_at: string;
+}
+
+export interface FloorPlan {
+  id: string;
+  project_id: string;
+  name: string;
+  image_url: string;
+  created_at: string;
+}
+
+export interface ScheduleTask {
+  id: string;
+  project_id: string;
+  name: string;
+  duration_days: number;
+  depends_on: string[];
+  planned_start: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
+  status: 'todo' | 'in_progress' | 'done';
+  sort_order: number;
   created_at: string;
 }
 

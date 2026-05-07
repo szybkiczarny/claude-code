@@ -1,6 +1,14 @@
 import 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, LogBox } from 'react-native';
+
+// Expo Go (SDK 53+) removed push notifications — suppress the console.error
+// that otherwise crashes LogBox with a nullthrows internal error.
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  'expo-notifications: iOS Push notifications',
+  'expo-notifications: Push notifications',
+]);
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
